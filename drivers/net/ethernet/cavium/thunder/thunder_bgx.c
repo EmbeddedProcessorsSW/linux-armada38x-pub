@@ -1095,10 +1095,7 @@ static int bgx_lmac_enable(struct bgx *bgx, u8 lmacid)
 	/* Restore default cfg, incase low level firmware changed it */
 	bgx_reg_write(bgx, lmacid, BGX_CMRX_RX_DMAC_CTL, 0x03);
 
-	if ((lmac->lmac_type != BGX_MODE_XFI) &&
-	    (lmac->lmac_type != BGX_MODE_XLAUI) &&
-	    (lmac->lmac_type != BGX_MODE_40G_KR) &&
-	    (lmac->lmac_type != BGX_MODE_10G_KR)) {
+	if (lmac->is_sgmii) {
 		if (!lmac->phydev) {
 			if (lmac->autoneg) {
 				bgx_reg_write(bgx, lmacid,
