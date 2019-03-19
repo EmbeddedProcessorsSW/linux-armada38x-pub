@@ -59,6 +59,37 @@ static inline unsigned int cpumask_any_housekeeping(const struct cpumask *mask)
 	return cpu;
 }
 
+/**
+ * cpumask_any_housekeeping_but() - Chose any cpu in @mask, preferring those
+ *			            that aren't marked nohz_full, excluding
+ *				    the provided CPU
+ * @mask:	The mask to pick a CPU from.
+ * @exclude_cpu:The CPU to avoid picking.
+ *
+ * Returns a CPU from @mask, but not @but. If there are houskeeping CPUs that
+ * don't use nohz_full, these are preferred.
+ * Returns >= nr_cpu_ids if no CPUs are available.
+ */
+static inline unsigned int
+cpumask_any_housekeeping_but(const struct cpumask *mask, int exclude_cpu)
+{
+	cpumask_var_t tmpmask;
+	int cpu;
+
+	cpu = cpumask_any_but(mask, exclude_cpu);
+	if (tick_nohz_full_cpu(cpu)) {
+		if (!zalloc_cpumask_var(&tmpmask, GFP_KERNEL))
+			return cpu;
+
+		cpumask_andnot(tmpmask, mask, tick_nohz_full_mask);
+		if (!cpumask_empty(tmpmask))
+			cpu = cpumask_any_but(tmpmask, exclude_cpu);
+		free_cpumask_var(tmpmask);
+	}
+
+	return cpu;
+}
+
 struct rdt_fs_context {
 	struct kernfs_fs_context	kfc;
 	bool				enable_cdpl2;
@@ -541,11 +572,13 @@ void mon_event_read(struct rmid_read *rr, struct rdt_resource *r,
 		    struct rdt_domain *d, struct rdtgroup *rdtgrp,
 		    int evtid, int first);
 void mbm_setup_overflow_handler(struct rdt_domain *dom,
-				unsigned long delay_ms);
+				unsigned long delay_ms,
+				int exclude_cpu);
 void mbm_handle_overflow(struct work_struct *work);
 void __init intel_rdt_mbm_apply_quirk(void);
 bool is_mba_sc(struct rdt_resource *r);
-void cqm_setup_limbo_handler(struct rdt_domain *dom, unsigned long delay_ms);
+void cqm_setup_limbo_handler(struct rdt_domain *dom, unsigned long delay_ms,
+			     int exclude_cpu);
 void cqm_handle_limbo(struct work_struct *work);
 bool has_busy_rmid(struct rdt_resource *r, struct rdt_domain *d);
 void __check_limbo(struct rdt_domain *d, bool force_free);
