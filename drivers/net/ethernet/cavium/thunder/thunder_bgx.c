@@ -1242,7 +1242,10 @@ static void bgx_print_qlm_mode(struct bgx *bgx, u8 lmacid)
 
 	switch (lmac->lmac_type) {
 	case BGX_MODE_SGMII:
-		dev_info(dev, "%s: SGMII\n", (char *)str);
+		if (bgx_reg_read(bgx, lmacid, BGX_GMP_PCS_MISCX_CTL) & 0x100)
+			dev_info(dev, "%s: 1000Base-X\n", (char *)str);
+		else
+			dev_info(dev, "%s: SGMII\n", (char *)str);
 		break;
 	case BGX_MODE_XAUI:
 		dev_info(dev, "%s: XAUI\n", (char *)str);
