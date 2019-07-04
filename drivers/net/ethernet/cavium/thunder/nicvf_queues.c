@@ -370,7 +370,7 @@ static void nicvf_free_rbdr(struct nicvf *nic, struct rbdr *rbdr)
 		}
 		head++;
 	}
-
+	kfree(rbdr->pgcache);
 	/* Free RBDR ring */
 	nicvf_free_q_desc_mem(nic, &rbdr->dmem);
 }
