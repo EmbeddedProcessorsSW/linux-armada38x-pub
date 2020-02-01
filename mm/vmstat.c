@@ -1995,6 +1995,15 @@ void quiet_vmstat(void)
 }
 
 /*
+ * Synchronously quiet vmstat so the work is guaranteed not to run on return.
+ */
+void quiet_vmstat_sync(void)
+{
+	cancel_delayed_work_sync(this_cpu_ptr(&vmstat_work));
+	refresh_cpu_vm_stats(false);
+}
+
+/*
  * Shepherd worker thread that checks the
  * differentials of processors that have their worker
  * threads for vm statistics updates disabled because of
