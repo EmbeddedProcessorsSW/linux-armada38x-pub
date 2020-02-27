@@ -1190,9 +1190,21 @@ static void do_nothing(void *unused)
  */
 void kick_all_cpus_sync(void)
 {
+	struct cpumask mask;
+
 	/* Make sure the change is visible before we kick the cpus */
 	smp_mb();
-	smp_call_function(do_nothing, NULL, 1);
+
+	preempt_disable();
+#ifdef CONFIG_TASK_ISOLATION
+	cpumask_clear(&mask);
+	task_isolation_cpumask(&mask);
+	cpumask_complement(&mask, &mask);
+#else
+	cpumask_setall(&mask);
+#endif
+	smp_call_function_many(&mask, do_nothing, NULL, 1);
+	preempt_enable();
 }
 EXPORT_SYMBOL_GPL(kick_all_cpus_sync);
 
