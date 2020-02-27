@@ -74,6 +74,7 @@
 #include <linux/cpu.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
+#include <linux/isolation.h>
 #include <linux/hash.h>
 #include <linux/slab.h>
 #include <linux/sched.h>
@@ -5885,6 +5886,8 @@ static void flush_all_backlogs(void)
 	cpumask_clear(&flush_cpus);
 	for_each_online_cpu(cpu) {
 		if (flush_required(cpu)) {
+			if (task_isolation_on_cpu(cpu))
+				continue;
 			queue_work_on(cpu, system_highpri_wq,
 				      per_cpu_ptr(&flush_works, cpu));
 			cpumask_set_cpu(cpu, &flush_cpus);
