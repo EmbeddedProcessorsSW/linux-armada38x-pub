@@ -22,6 +22,7 @@
 #include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/init.h>
+#include <linux/isolation.h>
 #include <linux/hash.h>
 #include <linux/list.h>
 #include <linux/cpu.h>
@@ -2142,6 +2143,39 @@ static void update_pages_handler(struct work_struct *work)
 	complete(&cpu_buffer->update_done);
 }
 
+static bool update_if_isolated(struct ring_buffer_per_cpu *cpu_buffer,
+			       int cpu)
+{
+	bool rv = false;
+
+	/* Synchronize low-level isolation flags */
+	smp_rmb();
+	if (task_isolation_on_cpu(cpu)) {
+		/*
+		 * CPU is running isolated task. Since it may lose
+		 * isolation and re-enter kernel simultaneously with
+		 * this update, disable recording until it's done.
+		 */
+		atomic_inc(&cpu_buffer->record_disabled);
+		/* Make sure, update is done, and isolation state is current */
+		smp_mb();
+		if (task_isolation_on_cpu(cpu)) {
+			/*
+			 * If CPU is still running isolated task, we
+			 * can be sure that breaking isolation will
+			 * happen while recording is disabled, and CPU
+			 * will not touch this buffer until the update
+			 * is done.
+			 */
+			rb_update_pages(cpu_buffer);
+			cpu_buffer->nr_pages_to_update = 0;
+			rv = true;
+		}
+		atomic_dec(&cpu_buffer->record_disabled);
+	}
+	return rv;
+}
+
 /**
  * ring_buffer_resize - resize the ring buffer
  * @buffer: the buffer to resize.
@@ -2231,13 +2265,22 @@ int ring_buffer_resize(struct trace_buffer *buffer, unsigned long size,
 			if (!cpu_buffer->nr_pages_to_update)
 				continue;
 
-			/* Can't run something on an offline CPU. */
+			/*
+			 * Can't run something on an offline CPU.
+			 *
+			 * CPUs running isolated tasks don't have to
+			 * update ring buffers until they exit
+			 * isolation because they are in
+			 * userspace. Use the procedure that prevents
+			 * race condition with isolation breaking.
+			 */
 			if (!cpu_online(cpu)) {
 				rb_update_pages(cpu_buffer);
 				cpu_buffer->nr_pages_to_update = 0;
 			} else {
-				schedule_work_on(cpu,
-						&cpu_buffer->update_pages_work);
+				if (!update_if_isolated(cpu_buffer, cpu))
+					schedule_work_on(cpu,
+					&cpu_buffer->update_pages_work);
 			}
 		}
 
@@ -2282,13 +2325,22 @@ int ring_buffer_resize(struct trace_buffer *buffer, unsigned long size,
 
 		cpus_read_lock();
 
-		/* Can't run something on an offline CPU. */
+		/*
+		 * Can't run something on an offline CPU.
+		 *
+		 * CPUs running isolated tasks don't have to update
+		 * ring buffers until they exit isolation because they
+		 * are in userspace. Use the procedure that prevents
+		 * race condition with isolation breaking.
+		 */
 		if (!cpu_online(cpu_id))
 			rb_update_pages(cpu_buffer);
 		else {
-			schedule_work_on(cpu_id,
+			if (!update_if_isolated(cpu_buffer, cpu_id)) {
+				schedule_work_on(cpu_id,
 					 &cpu_buffer->update_pages_work);
-			wait_for_completion(&cpu_buffer->update_done);
+				wait_for_completion(&cpu_buffer->update_done);
+			}
 		}
 
 		cpu_buffer->nr_pages_to_update = 0;
