@@ -20,15 +20,68 @@
 
 #define PCI_DEVICE_ID_BPHY	0xA089
 
+#define PSM_GPINT0_SUM_W1C	0x0ULL
+#define PSM_GPINT0_SUM_W1S	0x40ULL
+#define PSM_GPINT0_ENA_W1C	0x80ULL
+#define PSM_GPINT0_ENA_W1S	0xC0ULL
+
+#define CPRI_INT_MASK		0x1F
+
+#define CPRI_IP_AXI_INT_STATUS(a)	(0x100ULL | a << 10)
+#define CPRI_IP_AXI_INT(a)		(0x108ULL | a << 10)
+
 struct mrvl_loki {
-	void __iomem *msix;
 	struct pci_dev *pdev;
 	struct msix_entry msix_ent;
+	void __iomem *psm_gpint;
+	void __iomem *cpri_axi[3];
 	int intr_num;
+
+	int (*irq_cb)(uint32_t instance, uint32_t pss_int);
 };
+
+struct mrvl_loki *g_ml;
+
+int mrvl_loki_register_irq_cb(int (*func)(uint32_t instance, uint32_t pss_int))
+{
+	if (!g_ml) {
+		pr_err("Error: mrvl_loki is NULL\n");
+		return -ENOENT;
+	}
+
+	if (func)
+		g_ml->irq_cb = func;
+	else
+		return -EIO;
+
+	return 0;
+}
+EXPORT_SYMBOL(mrvl_loki_register_irq_cb);
 
 static irqreturn_t mrvl_loki_handler(int irq, void *dev)
 {
+	struct mrvl_loki *ml =
+		platform_get_drvdata((struct platform_device *)dev);
+	uint32_t instance, pss_int, val;
+	uint8_t cpri, mac;
+	int ret;
+
+	val = readq_relaxed(ml->psm_gpint + PSM_GPINT0_SUM_W1C) & CPRI_INT_MASK;
+
+	instance = ffs(val) - 1;
+	cpri = instance / 2;
+	mac = instance % 2;
+	pss_int = (u32)readq_relaxed(ml->cpri_axi[cpri] +
+				CPRI_IP_AXI_INT_STATUS(mac));
+	if (ml->irq_cb) {
+		ret = ml->irq_cb(instance, pss_int);
+		if (ret < 0)
+			dev_err(dev, "Error %d from loki CPRI callback\n", ret);
+	}
+
+	writeq_relaxed(val, ml->psm_gpint + PSM_GPINT0_SUM_W1C);
+	writeq_relaxed((u64)pss_int, ml->cpri_axi[cpri] + CPRI_IP_AXI_INT(mac));
+
 	return IRQ_HANDLED;
 };
 
@@ -46,7 +99,7 @@ static int mrvl_loki_probe(struct platform_device *pdev)
 	struct mrvl_loki *ml;
 	struct device *dev = &pdev->dev;
 	struct pci_dev *bphy_pdev;
-	uint64_t regval;
+	struct resource *res;
 	int ret = 0;
 
 	ml = devm_kzalloc(dev, sizeof(*ml), GFP_KERNEL);
@@ -73,6 +126,34 @@ static int mrvl_loki_probe(struct platform_device *pdev)
 
 	msix_enable_ctrl(bphy_pdev);
 
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	ml->psm_gpint = ioremap(res->start, resource_size(res));
+	if (IS_ERR(ml->psm_gpint)) {
+		dev_err(dev, "error in ioremap PSM GPINT\n");
+		return PTR_ERR(ml->psm_gpint);
+	}
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	ml->cpri_axi[0] = ioremap(res->start, resource_size(res));
+	if (IS_ERR(ml->cpri_axi[0])) {
+		dev_err(dev, "error in ioremap CPRI AXI0\n");
+		return PTR_ERR(ml->cpri_axi[0]);
+	}
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+	ml->cpri_axi[1] = ioremap(res->start, resource_size(res));
+	if (IS_ERR(ml->cpri_axi[1])) {
+		dev_err(dev, "error in ioremap CPRI AXI1\n");
+		return PTR_ERR(ml->cpri_axi[1]);
+	}
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 3);
+	ml->cpri_axi[2] = ioremap(res->start, resource_size(res));
+	if (IS_ERR(ml->cpri_axi[2])) {
+		dev_err(dev, "error in ioremap CPRI AXI2\n");
+		return PTR_ERR(ml->cpri_axi[2]);
+	}
+
 	/* register interrupt */
 	ml->intr_num = irq_of_parse_and_map(dev->of_node, 0);
 
@@ -83,6 +164,7 @@ static int mrvl_loki_probe(struct platform_device *pdev)
 		goto err;
 	}
 
+	g_ml = ml;
 	dev_info(dev, "Registered interrupt handler for %d\n", ml->intr_num);
 
 	return 0;
