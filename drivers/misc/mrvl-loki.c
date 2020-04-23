@@ -61,6 +61,12 @@ int mrvl_loki_register_irq_cb(connip_irq_cb_t func)
 }
 EXPORT_SYMBOL(mrvl_loki_register_irq_cb);
 
+void mrvl_loki_unregister_irq_cb(void)
+{
+	g_ml->irq_cb = NULL;
+}
+EXPORT_SYMBOL(mrvl_loki_unregister_irq_cb);
+
 static irqreturn_t mrvl_loki_handler(int irq, void *dev)
 {
 	struct mrvl_loki *ml =
