@@ -1879,11 +1879,11 @@ int rvu_mbox_handler_attach_resources(struct rvu *rvu,
 		goto exit;
 
 	/* Now attach the requested resources */
-	if (attach->npalf)
-		rvu_attach_block(rvu, pcifunc, BLKTYPE_NPA, 1, attach);
-
 	if (attach->nixlf)
 		rvu_attach_block(rvu, pcifunc, BLKTYPE_NIX, 1, attach);
+
+	if (attach->npalf)
+		rvu_attach_block(rvu, pcifunc, BLKTYPE_NPA, 1, attach);
 
 	if (attach->sso) {
 		/* RVU func doesn't know which exact LF or slot is attached
@@ -1987,6 +1987,8 @@ static void rvu_clear_msix_offset(struct rvu *rvu, struct rvu_pfvf *pfvf,
 		    (lf << block->lfshift), cfg & ~0x7FFULL);
 
 	offset = rvu_get_msix_offset(rvu, pfvf, block->addr, lf);
+	if (offset == MSIX_VECTOR_INVALID)
+		return;
 
 	/* Update the mapping */
 	for (vec = 0; vec < nvecs; vec++)
