@@ -25,24 +25,27 @@
 #define PSM_GPINT0_ENA_W1C	0x80ULL
 #define PSM_GPINT0_ENA_W1S	0xC0ULL
 
-#define CPRI_INT_MASK		0x1F
-
 #define CPRI_IP_AXI_INT_STATUS(a)	(0x100ULL | a << 10)
 #define CPRI_IP_AXI_INT(a)		(0x108ULL | a << 10)
+
+#define CPRI_MAX_MHAB		3
+#define CONNIP_MAX_INST		5
+#define CPRI_INT_MASK		0x1F
+
+typedef int (*connip_irq_cb_t)(uint32_t instance, uint32_t pss_int);
 
 struct mrvl_loki {
 	struct pci_dev *pdev;
 	struct msix_entry msix_ent;
 	void __iomem *psm_gpint;
-	void __iomem *cpri_axi[3];
+	void __iomem *cpri_axi[CPRI_MAX_MHAB];
 	int intr_num;
-
-	int (*irq_cb)(uint32_t instance, uint32_t pss_int);
+	connip_irq_cb_t irq_cb;
 };
 
 struct mrvl_loki *g_ml;
 
-int mrvl_loki_register_irq_cb(int (*func)(uint32_t instance, uint32_t pss_int))
+int mrvl_loki_register_irq_cb(connip_irq_cb_t func)
 {
 	if (!g_ml) {
 		pr_err("Error: mrvl_loki is NULL\n");
@@ -66,24 +69,32 @@ static irqreturn_t mrvl_loki_handler(int irq, void *dev)
 	uint8_t cpri, mac;
 	int ret;
 
+	/* clear GPINT */
 	val = readq_relaxed(ml->psm_gpint + PSM_GPINT0_SUM_W1C) & CPRI_INT_MASK;
+	writeq_relaxed((u64)val, ml->psm_gpint + PSM_GPINT0_SUM_W1C);
 
-	instance = ffs(val) - 1;
-	cpri = instance / 2;
-	mac = instance % 2;
-	pss_int = (u32)readq_relaxed(ml->cpri_axi[cpri] +
-				CPRI_IP_AXI_INT_STATUS(mac));
-	if (ml->irq_cb) {
-		ret = ml->irq_cb(instance, pss_int);
-		if (ret < 0)
-			dev_err(dev, "Error %d from loki CPRI callback\n", ret);
+	for (instance = 0; instance < CONNIP_MAX_INST; instance++) {
+		if (!(val & (1 << instance)))
+			continue;
+		cpri = instance / 2;
+		mac = instance % 2;
+		pss_int = (u32)readq_relaxed(ml->cpri_axi[cpri] +
+					     CPRI_IP_AXI_INT_STATUS(mac));
+		if (ml->irq_cb) {
+			ret = ml->irq_cb(instance, pss_int);
+			if (ret < 0)
+				dev_err(dev,
+					"Error %d from loki CPRI callback\n",
+					ret);
+		}
+
+		/* clear AXI_INT */
+		writeq_relaxed((u64)pss_int,
+			       ml->cpri_axi[cpri] + CPRI_IP_AXI_INT(mac));
 	}
 
-	writeq_relaxed(val, ml->psm_gpint + PSM_GPINT0_SUM_W1C);
-	writeq_relaxed((u64)pss_int, ml->cpri_axi[cpri] + CPRI_IP_AXI_INT(mac));
-
 	return IRQ_HANDLED;
-};
+}
 
 static inline void msix_enable_ctrl(struct pci_dev *dev)
 {
