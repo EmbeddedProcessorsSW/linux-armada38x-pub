@@ -15,6 +15,7 @@
  * Software Developer Manual June 2016, volume 3, section 17.17.
  */
 
+#include <linux/cpu.h>
 #include <linux/module.h>
 #include <linux/sizes.h>
 #include <linux/slab.h>
@@ -254,7 +255,7 @@ static void smp_call_rmid_read(void *_arg)
 
 int resctrl_arch_rmid_read(struct rdt_resource *r, struct rdt_domain *d,
 			   u32 closid, u32 rmid, enum resctrl_event_id eventid,
-			   u64 *val)
+			   u64 *val, int ignored)
 {
 	struct rdt_hw_resource *hw_res = resctrl_to_arch_res(r);
 	struct rdt_hw_domain *hw_dom = resctrl_to_arch_dom(d);
@@ -300,8 +301,13 @@ void __check_limbo(struct rdt_domain *d, bool force_free)
 	u32 idx_limit = resctrl_arch_system_num_rmid_idx();
 	struct rmid_entry *entry;
 	u32 idx, cur_idx = 1;
+	int arch_mon_ctx;
 	bool rmid_dirty;
 	u64 val = 0;
+
+	arch_mon_ctx = resctrl_arch_mon_ctx_alloc(r, QOS_L3_OCCUP_EVENT_ID);
+	if (arch_mon_ctx < 0)
+		return;
 
 	/*
 	 * Skip RMID 0 and start from RMID 1 and check all the RMIDs that
@@ -316,7 +322,8 @@ void __check_limbo(struct rdt_domain *d, bool force_free)
 
 		entry = __rmid_entry(idx);
 		if (resctrl_arch_rmid_read(r, d, entry->closid, entry->rmid,
-					   QOS_L3_OCCUP_EVENT_ID, &val)) {
+					   QOS_L3_OCCUP_EVENT_ID, &val,
+					   arch_mon_ctx)) {
 			rmid_dirty = true;
 		} else {
 			rmid_dirty = (val >= resctrl_rmid_realloc_threshold);
@@ -331,6 +338,8 @@ void __check_limbo(struct rdt_domain *d, bool force_free)
 		}
 		cur_idx = idx + 1;
 	}
+
+	resctrl_arch_mon_ctx_free(r, QOS_L3_OCCUP_EVENT_ID, arch_mon_ctx);
 }
 
 bool has_busy_rmid(struct rdt_resource *r, struct rdt_domain *d)
@@ -422,16 +431,22 @@ static void add_rmid_to_limbo(struct rmid_entry *entry)
 {
 	struct rdt_resource *r = &rdt_resources_all[RDT_RESOURCE_L3].r_resctrl;
 	struct rdt_domain *d;
+	int arch_mon_ctx;
 	u64 val = 0;
 	u32 idx;
 	int err;
 
 	idx = resctrl_arch_rmid_idx_encode(entry->closid, entry->rmid);
 
+	arch_mon_ctx = resctrl_arch_mon_ctx_alloc(r, QOS_L3_OCCUP_EVENT_ID);
+	if (arch_mon_ctx < 0)
+		return;
+
 	entry->busy = 0;
 	list_for_each_entry(d, &r->domains, list) {
 		err = resctrl_arch_rmid_read(r, d, entry->closid, entry->rmid,
-					     QOS_L3_OCCUP_EVENT_ID, &val);
+					     QOS_L3_OCCUP_EVENT_ID, &val,
+					     arch_mon_ctx);
 		if (err || val <= resctrl_rmid_realloc_threshold)
 			continue;
 
@@ -444,6 +459,7 @@ static void add_rmid_to_limbo(struct rmid_entry *entry)
 		set_bit(idx, d->rmid_busy_llc);
 		entry->busy++;
 	}
+	resctrl_arch_mon_ctx_free(r, QOS_L3_OCCUP_EVENT_ID, arch_mon_ctx);
 
 	if (entry->busy)
 		rmid_limbo_count++;
@@ -480,7 +496,7 @@ static int __mon_event_count(u32 closid, u32 rmid, struct rmid_read *rr)
 		resctrl_arch_reset_rmid(rr->r, rr->d, closid, rmid, rr->evtid);
 
 	rr->err = resctrl_arch_rmid_read(rr->r, rr->d, closid, rmid, rr->evtid,
-					 &tval);
+					 &tval, rr->arch_mon_ctx);
 	if (rr->err)
 		return rr->err;
 
@@ -553,6 +569,9 @@ int mon_event_count(void *info)
 	int ret;
 
 	rdtgrp = rr->rgrp;
+	rr->arch_mon_ctx = resctrl_arch_mon_ctx_alloc(rr->r, rr->evtid);
+	if (rr->arch_mon_ctx < 0)
+		return rr->arch_mon_ctx;
 
 	ret = __mon_event_count(rdtgrp->closid, rdtgrp->mon.rmid, rr);
 
@@ -578,6 +597,8 @@ int mon_event_count(void *info)
 	 */
 	if (ret == 0)
 		rr->err = 0;
+
+	resctrl_arch_mon_ctx_free(rr->r, rr->evtid, rr->arch_mon_ctx);
 
 	return 0;
 }
@@ -715,11 +736,21 @@ static void mbm_update(struct rdt_resource *r, struct rdt_domain *d,
 	if (is_mbm_total_enabled()) {
 		rr.evtid = QOS_L3_MBM_TOTAL_EVENT_ID;
 		rr.val = 0;
+		rr.arch_mon_ctx = resctrl_arch_mon_ctx_alloc(rr.r, rr.evtid);
+		if (rr.arch_mon_ctx < 0)
+			return;
+
 		__mon_event_count(closid, rmid, &rr);
+
+		resctrl_arch_mon_ctx_free(rr.r, rr.evtid, rr.arch_mon_ctx);
 	}
 	if (is_mbm_local_enabled()) {
 		rr.evtid = QOS_L3_MBM_LOCAL_EVENT_ID;
 		rr.val = 0;
+		rr.arch_mon_ctx = resctrl_arch_mon_ctx_alloc(rr.r, rr.evtid);
+		if (rr.arch_mon_ctx < 0)
+			return;
+
 		__mon_event_count(closid, rmid, &rr);
 
 		/*
@@ -729,6 +760,7 @@ static void mbm_update(struct rdt_resource *r, struct rdt_domain *d,
 		 */
 		if (is_mba_sc(NULL))
 			mbm_bw_count(closid, rmid, &rr);
+		resctrl_arch_mon_ctx_free(rr.r, rr.evtid, rr.arch_mon_ctx);
 	}
 }
 
