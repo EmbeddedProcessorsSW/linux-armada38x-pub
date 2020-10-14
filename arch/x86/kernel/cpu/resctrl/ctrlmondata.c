@@ -19,6 +19,7 @@
 #include <linux/kernfs.h>
 #include <linux/seq_file.h>
 #include <linux/slab.h>
+#include <linux/tick.h>
 #include "internal.h"
 
 /*
@@ -525,12 +526,22 @@ int rdtgroup_schemata_show(struct kernfs_open_file *of,
 	return ret;
 }
 
+static void smp_mon_event_count(void *arg)
+{
+	mon_event_count(arg);
+}
+
 void mon_event_read(struct rmid_read *rr, struct rdt_resource *r,
 		    struct rdt_domain *d, struct rdtgroup *rdtgrp,
 		    int evtid, int first)
 {
+	int cpu;
+
+	/* When picking a CPU from cpu_mask, ensure it can't race with cpuhp */
+	lockdep_assert_held(&rdtgroup_mutex);
+
 	/*
-	 * setup the parameters to send to the IPI to read the data.
+	 * setup the parameters to pass to mon_event_count() to read the data.
 	 */
 	rr->rgrp = rdtgrp;
 	rr->evtid = evtid;
@@ -539,7 +550,24 @@ void mon_event_read(struct rmid_read *rr, struct rdt_resource *r,
 	rr->val = 0;
 	rr->first = first;
 
-	smp_call_function_any(&d->cpu_mask, mon_event_count, rr, 1);
+	cpu = get_cpu();
+	if (cpumask_test_cpu(cpu, &d->cpu_mask)) {
+		smp_call_function_single(cpu, smp_mon_event_count, rr, true);
+		put_cpu();
+	} else {
+		put_cpu();
+
+		/*
+		 * If all the CPUs available use nohz_full, fall back to an IPI.
+		 * Some MPAM systems will be unable to use their counters in this case.
+		 */
+		cpu = cpumask_any_housekeeping(&d->cpu_mask);
+		if (tick_nohz_full_cpu(cpu))
+			smp_call_function_single(cpu, smp_mon_event_count, rr,
+						 true);
+		else
+			smp_call_on_cpu(cpu, mon_event_count, rr, false);
+	}
 }
 
 int rdtgroup_mondata_show(struct seq_file *m, void *arg)
