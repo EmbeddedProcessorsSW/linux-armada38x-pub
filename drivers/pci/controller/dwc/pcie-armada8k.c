@@ -54,6 +54,10 @@ struct armada8k_pcie {
 #define PCIE_INT_C_ASSERT_MASK		BIT(11)
 #define PCIE_INT_D_ASSERT_MASK		BIT(12)
 
+#define PCIE_GLOBAL_INT_CAUSE2_REG	(PCIE_VENDOR_REGS_OFFSET + 0x24)
+#define PCIE_GLOBAL_INT_MASK2_REG	(PCIE_VENDOR_REGS_OFFSET + 0x28)
+#define PCIE_INT2_PHY_RST_LINK_DOWN	BIT(1)
+
 #define PCIE_ARCACHE_TRC_REG		(PCIE_VENDOR_REGS_OFFSET + 0x50)
 #define PCIE_AWCACHE_TRC_REG		(PCIE_VENDOR_REGS_OFFSET + 0x54)
 #define PCIE_ARUSER_REG			(PCIE_VENDOR_REGS_OFFSET + 0x5C)
@@ -205,6 +209,11 @@ static int armada8k_pcie_host_init(struct dw_pcie_rp *pp)
 	       PCIE_INT_C_ASSERT_MASK | PCIE_INT_D_ASSERT_MASK;
 	dw_pcie_writel_dbi(pci, PCIE_GLOBAL_INT_MASK1_REG, reg);
 
+	/* Also enable link down interrupts */
+	reg = dw_pcie_readl_dbi(pci, PCIE_GLOBAL_INT_MASK2_REG);
+	reg |= PCIE_INT2_PHY_RST_LINK_DOWN;
+	dw_pcie_writel_dbi(pci, PCIE_GLOBAL_INT_MASK2_REG, reg);
+
 	return 0;
 }
 
@@ -221,6 +230,35 @@ static irqreturn_t armada8k_pcie_irq_handler(int irq, void *arg)
 	 */
 	val = dw_pcie_readl_dbi(pci, PCIE_GLOBAL_INT_CAUSE1_REG);
 	dw_pcie_writel_dbi(pci, PCIE_GLOBAL_INT_CAUSE1_REG, val);
+
+	val = dw_pcie_readl_dbi(pci, PCIE_GLOBAL_INT_CAUSE2_REG);
+
+	if (PCIE_INT2_PHY_RST_LINK_DOWN & val) {
+		u32 ctrl_reg = dw_pcie_readl_dbi(pci, PCIE_GLOBAL_CONTROL_REG);
+		/*
+		 * The link went down. Disable LTSSM immediately. This
+		 * unlocks the root complex config registers. Downstream
+		 * device accesses will return all-Fs
+		 */
+		ctrl_reg &= ~(PCIE_APP_LTSSM_EN);
+		dw_pcie_writel_dbi(pci, PCIE_GLOBAL_CONTROL_REG, ctrl_reg);
+		/*
+		 * Mask link down interrupts. They can be re-enabled once
+		 * the link is retrained.
+		 */
+		ctrl_reg = dw_pcie_readl_dbi(pci, PCIE_GLOBAL_INT_MASK2_REG);
+		ctrl_reg &= ~PCIE_INT2_PHY_RST_LINK_DOWN;
+		dw_pcie_writel_dbi(pci, PCIE_GLOBAL_INT_MASK2_REG, ctrl_reg);
+		/*
+		 * At this point a worker thread can be triggered to
+		 * initiate a link retrain. If link retrains were
+		 * possible, that is.
+		 */
+		dev_dbg(pci->dev, "%s: link went down\n", __func__);
+	}
+
+	/* Now clear the second interrupt cause. */
+	dw_pcie_writel_dbi(pci, PCIE_GLOBAL_INT_CAUSE2_REG, val);
 
 	return IRQ_HANDLED;
 }
