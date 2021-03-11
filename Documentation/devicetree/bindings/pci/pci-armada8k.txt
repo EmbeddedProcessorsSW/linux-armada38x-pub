@@ -24,6 +24,10 @@ Optional properties:
 - phy-names: names of the PHYs corresponding to the number of lanes.
 	Must be "cp0-pcie0-x4-lane0-phy", "cp0-pcie0-x4-lane1-phy" for
 	2 PHYs.
+- marvell,system-controller: address of system controller needed
+	in order to reset MAC used by link-down handle
+- marvell,mac-reset-bit-mask: MAC reset bit of system controller
+	needed in order to reset MAC used by link-down handle
 
 Example:
 
@@ -45,4 +49,6 @@ Example:
 		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
 		num-lanes = <1>;
 		clocks = <&cpm_syscon0 1 13>;
+		marvell,system-controller = <&CP11X_LABEL(syscon0)>;
+		marvell,mac-reset-bit-mask = <CP11X_PCIEx_MAC_RESET_BIT_MASK(1)>;
 	};
