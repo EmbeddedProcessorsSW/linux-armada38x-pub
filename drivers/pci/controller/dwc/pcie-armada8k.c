@@ -24,6 +24,7 @@
 #include <linux/of_irq.h>
 #include <linux/mfd/syscon.h>
 #include <linux/regmap.h>
+#include <linux/of_gpio.h>
 
 #include "pcie-designware.h"
 
@@ -38,6 +39,8 @@ struct armada8k_pcie {
 	struct regmap *sysctrl_base;
 	u32 mac_rest_bitmask;
 	struct work_struct recover_link_work;
+	enum of_gpio_flags flags;
+	struct gpio_desc *reset_gpio;
 };
 
 #define PCIE_VENDOR_REGS_OFFSET		0x8000
@@ -239,9 +242,18 @@ static void armada8k_pcie_recover_link(struct work_struct *ws)
 	}
 	pci_lock_rescan_remove();
 	pci_stop_and_remove_bus_device(root_port);
+	/* Reset device if reset gpio is set */
+	if (pcie->reset_gpio) {
+		/* assert and then deassert the reset signal */
+		gpiod_set_value_cansleep(pcie->reset_gpio, 0);
+		msleep(100);
+		gpiod_set_value_cansleep(pcie->reset_gpio,
+					 (pcie->flags & OF_GPIO_ACTIVE_LOW) ? 0 : 1);
+	}
 	/*
-	 * Sleep needed to make sure all pcie transactions and access
-	 * are flushed before resetting the mac
+	 * Sleep used for two reasons.
+	 * First make sure all pcie transactions and access are flushed before resetting the mac
+	 * and second to make sure pci device is ready in case we reset the device
 	 */
 	msleep(100);
 
@@ -377,6 +389,7 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
 	struct armada8k_pcie *pcie;
 	struct device *dev = &pdev->dev;
 	struct resource *base;
+	int reset_gpio;
 	int ret;
 
 	pcie = devm_kzalloc(dev, sizeof(*pcie), GFP_KERNEL);
@@ -420,6 +433,13 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
 		ret = PTR_ERR(pci->dbi_base);
 		goto fail_clkreg;
 	}
+
+	/* Config reset gpio for pcie if the reset connected to gpio */
+	reset_gpio = of_get_named_gpio_flags(pdev->dev.of_node,
+					     "reset-gpios", 0,
+					     &pcie->flags);
+	if (gpio_is_valid(reset_gpio))
+		pcie->reset_gpio = gpio_to_desc(reset_gpio);
 
 	pcie->sysctrl_base = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
 						       "marvell,system-controller");
