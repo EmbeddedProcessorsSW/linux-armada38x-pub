@@ -6,7 +6,7 @@
  */
 
 #include <dt-bindings/interrupt-controller/mvebu-icu.h>
-#define CP11X_PCIEx_MAC_RESET_BIT_MASK(n)	(0x1 << 11 + ((n + 2) % 3))
+#define CP11X_PCIEx_MAC_RESET_BIT(n)	(11 + ((n + 2) % 3))
 #include <dt-bindings/thermal/thermal.h>
 
 #include "armada-common.dtsi"
@@ -276,6 +276,12 @@
 					 <&CP11X_LABEL(clk) 1 17>;
 				status = "disabled";
 			};
+		};
+
+		CP11X_LABEL(pcie_mac_reset): pcie-mac-reset@0x440268 {
+			compatible = "snps,dw-low-reset";
+			#reset-cells = <1>;
+			reg = <0x440268 0x4>;
 		};
 
 		CP11X_LABEL(syscon1): system-controller@400000 {
@@ -565,8 +571,7 @@
 		num-lanes = <1>;
 		clock-names = "core", "reg";
 		clocks = <&CP11X_LABEL(clk) 1 13>, <&CP11X_LABEL(clk) 1 14>;
-		marvell,system-controller = <&CP11X_LABEL(syscon0)>;
-		marvell,mac-reset-bit-mask = <CP11X_PCIEx_MAC_RESET_BIT_MASK(0)>;
+		resets = <&CP11X_LABEL(pcie_mac_reset) CP11X_PCIEx_MAC_RESET_BIT(0)>;
 		status = "disabled";
 	};
 
@@ -592,8 +597,7 @@
 		num-lanes = <1>;
 		clock-names = "core", "reg";
 		clocks = <&CP11X_LABEL(clk) 1 11>, <&CP11X_LABEL(clk) 1 14>;
-		marvell,system-controller = <&CP11X_LABEL(syscon0)>;
-		marvell,mac-reset-bit-mask = <CP11X_PCIEx_MAC_RESET_BIT_MASK(1)>;
+		resets = <&CP11X_LABEL(pcie_mac_reset) CP11X_PCIEx_MAC_RESET_BIT(1)>;
 		status = "disabled";
 	};
 
@@ -619,8 +623,7 @@
 		num-lanes = <1>;
 		clock-names = "core", "reg";
 		clocks = <&CP11X_LABEL(clk) 1 12>, <&CP11X_LABEL(clk) 1 14>;
-		marvell,system-controller = <&CP11X_LABEL(syscon0)>;
-		marvell,mac-reset-bit-mask = <CP11X_PCIEx_MAC_RESET_BIT_MASK(2)>;
+		resets = <&CP11X_LABEL(pcie_mac_reset) CP11X_PCIEx_MAC_RESET_BIT(2)>;
 		status = "disabled";
 	};
 };
