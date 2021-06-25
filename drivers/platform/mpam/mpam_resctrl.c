@@ -29,6 +29,12 @@ static bool exposed_alloc_capable;
 static bool exposed_mon_capable;
 static struct mpam_class *mbm_local_class;
 
+/*
+ * MPAM emulates CDP by setting different PARTID in the I/D fields of MPAM1_EL1.
+ * This applies globally to all traffic the CPU generates.
+ */
+static bool cdp_enabled;
+
 bool resctrl_arch_alloc_capable(void)
 {
 	return exposed_alloc_capable;
@@ -44,6 +50,18 @@ bool resctrl_arch_is_mbm_local_enabled(void)
 	return mbm_local_class;
 }
 
+bool resctrl_arch_get_cdp_enabled(enum resctrl_res_level ignored)
+{
+	return cdp_enabled;
+}
+
+int resctrl_arch_set_cdp_enabled(enum resctrl_res_level ignored, bool enable)
+{
+	cdp_enabled = enable;
+
+	return 0;
+}
+
 /*
  * MSC may raise an error interrupt if it sees an out or range partid/pmg,
  * and go on to truncate the value. Regardless of what the hardware supports,
@@ -52,6 +70,30 @@ bool resctrl_arch_is_mbm_local_enabled(void)
 u32 resctrl_arch_get_num_closid(struct rdt_resource *ignored)
 {
 	return min((u32)mpam_partid_max + 1, (u32)RESCTRL_MAX_CLOSID);
+}
+
+bool resctrl_arch_match_closid(struct task_struct *tsk, u32 closid)
+{
+	u64 regval = mpam_get_regval(tsk);
+	u32 tsk_closid = FIELD_GET(MPAM_SYSREG_PARTID_D, regval);
+
+	if (cdp_enabled)
+		tsk_closid >>= 1;
+
+	return tsk_closid == closid;
+}
+
+/* The task's pmg is not unique, the partid must be considered too */
+bool resctrl_arch_match_rmid(struct task_struct *tsk, u32 closid, u32 rmid)
+{
+	u64 regval = mpam_get_regval(tsk);
+	u32 tsk_closid = FIELD_GET(MPAM_SYSREG_PARTID_D, regval);
+	u32 tsk_rmid = FIELD_GET(MPAM_SYSREG_PMG_D, regval);
+
+	if (cdp_enabled)
+		tsk_closid >>= 1;
+
+	return (tsk_closid == closid) && (tsk_rmid == rmid);
 }
 
 struct rdt_resource *resctrl_arch_get_resource(enum resctrl_res_level l)
