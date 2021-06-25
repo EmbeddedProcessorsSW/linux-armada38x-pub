@@ -68,4 +68,8 @@ u32 resctrl_arch_rmid_idx_encode(u32 closid, u32 rmid);
 void resctrl_arch_rmid_idx_decode(u32 idx, u32 *closid, u32 *rmid);
 u32 resctrl_arch_system_num_rmid_idx(void);
 
+struct rdt_resource;
+int resctrl_arch_mon_ctx_alloc_no_wait(struct rdt_resource *r, int evtid);
+void resctrl_arch_mon_ctx_free(struct rdt_resource *r, int evtid, int ctx);
+
 #endif /* __LINUX_ARM_MPAM_H */

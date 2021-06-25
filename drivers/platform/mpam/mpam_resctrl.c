@@ -20,6 +20,8 @@
 
 #include "mpam_internal.h"
 
+DECLARE_WAIT_QUEUE_HEAD(resctrl_mon_ctx_waiters);	// temporary
+
 /*
  * The classes we've picked to map to resctrl resources.
  * Class pointer may be NULL.
@@ -204,6 +206,40 @@ struct rdt_resource *resctrl_arch_get_resource(enum resctrl_res_level l)
 		return NULL;
 
 	return &mpam_resctrl_exports[l].resctrl_res;
+}
+
+int resctrl_arch_mon_ctx_alloc_no_wait(struct rdt_resource *r, int evtid)
+{
+	struct mpam_resctrl_res *res;
+
+	switch (evtid) {
+	case QOS_L3_OCCUP_EVENT_ID:
+		res = container_of(r, struct mpam_resctrl_res, resctrl_res);
+
+		return mpam_alloc_csu_mon(res->class);
+	case QOS_L3_MBM_LOCAL_EVENT_ID:
+		return USE_RMID_IDX;
+	case QOS_L3_MBM_TOTAL_EVENT_ID:
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+void resctrl_arch_mon_ctx_free(struct rdt_resource *r, int evtid, int ctx)
+{
+	struct mpam_resctrl_res *res;
+
+	switch (evtid) {
+	case QOS_L3_OCCUP_EVENT_ID:
+		res = container_of(r, struct mpam_resctrl_res, resctrl_res);
+
+		mpam_free_csu_mon(res->class, ctx);
+		wake_up(&resctrl_mon_ctx_waiters);
+		return;
+	case QOS_L3_MBM_TOTAL_EVENT_ID:
+	case QOS_L3_MBM_LOCAL_EVENT_ID:
+		return;
+	}
 }
 
 static bool cache_has_usable_cpor(struct mpam_class *class)
