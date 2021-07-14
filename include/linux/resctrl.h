@@ -242,6 +242,21 @@ u32 resctrl_arch_get_num_closid(struct rdt_resource *r);
 struct rdt_domain *resctrl_arch_find_domain(struct rdt_resource *r, int id);
 int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid);
 
+/* For use by arch code that needs to remap resctrl's smaller CDP closid */
+static inline u32 resctrl_get_config_index(u32 closid,
+					   enum resctrl_conf_type type)
+{
+	switch (type) {
+	default:
+	case CDP_NONE:
+		return closid;
+	case CDP_CODE:
+			return (closid * 2) + 1;
+	case CDP_DATA:
+			return (closid * 2);
+	}
+}
+
 /*
  * Update the ctrl_val and apply this config right now.
  * Must be called on one of the domain's CPUs.
