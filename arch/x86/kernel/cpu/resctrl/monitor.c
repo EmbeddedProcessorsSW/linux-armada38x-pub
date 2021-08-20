@@ -346,6 +346,37 @@ static struct rmid_entry *resctrl_find_free_rmid(u32 closid)
 	return ERR_PTR(-ENOSPC);
 }
 
+/**
+ * resctrl_closid_is_dirty - Determine if all RMID associated with this CLOSID
+ *                           are available.
+ * @closid: The CLOSID that is being queried.
+ *
+ * MPAM's equivalent of RMID are per-CLOSID, meaning a freshly allocated CLOSID
+ * may not be able to allocate clean RMID. To avoid this the allocator will
+ * only return clean CLOSID.
+ */
+bool resctrl_closid_is_dirty(u32 closid)
+{
+	struct rmid_entry *entry;
+	int i;
+
+	lockdep_assert_held(&rdtgroup_mutex);
+
+	if (!IS_ENABLED(CONFIG_RESCTRL_RMID_DEPENDS_ON_CLOSID))
+		return false;
+
+	for (i = 0; i < resctrl_arch_system_num_rmid_idx(); i++) {
+		entry = &rmid_ptrs[i];
+		if (entry->closid != closid)
+			continue;
+
+		if (entry->busy)
+			return true;
+	}
+
+	return false;
+}
+
 /*
  * For MPAM the RMID value is not unique, and has to be considered with
  * the CLOSID. The (CLOSID, RMID) pair is allocated on all domains, which
