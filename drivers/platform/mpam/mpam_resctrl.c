@@ -244,6 +244,24 @@ bool resctrl_arch_is_llc_occupancy_enabled(void)
 	return cache_has_usable_csu(mpam_resctrl_exports[RDT_RESOURCE_L3].class);
 }
 
+static bool class_has_usable_mbwu(struct mpam_class *class)
+{
+	struct mpam_props *cprops = &class->props;
+
+	if (!mpam_has_feature(mpam_feat_msmon_mbwu, cprops))
+		return false;
+
+	/*
+	 * resctrl expects the bandwidth counters to be free running,
+	 * which means we need as many monitors as resctrl has
+	 * control/monitor groups.
+	 */
+	if (cprops->num_mbwu_mon < resctrl_arch_system_num_rmid_idx())
+		return false;
+
+	return (mpam_partid_max > 1) || (mpam_pmg_max != 0);
+}
+
 static bool mba_class_use_mbw_part(struct mpam_props *cprops)
 {
 	/* TODO: Scaling is not yet supported */
@@ -433,6 +451,9 @@ static int mpam_resctrl_resource_init(struct mpam_resctrl_res *res)
 	/* Is this one of the two well-known caches? */
 	if (res->resctrl_res.rid == RDT_RESOURCE_L2 ||
 	    res->resctrl_res.rid == RDT_RESOURCE_L3) {
+		bool has_csu = cache_has_usable_csu(class);
+		bool has_mbwu = class_has_usable_mbwu(class);
+
 		/* TODO: Scaling is not yet supported */
 		r->cache.cbm_len = class->props.cpbm_wd;
 		r->cache.arch_has_sparse_bitmaps = true;
@@ -459,7 +480,13 @@ static int mpam_resctrl_resource_init(struct mpam_resctrl_res *res)
 			exposed_alloc_capable = true;
 		}
 
-		if (class->level == 3 && cache_has_usable_csu(class)) {
+		/*
+		 * MBWU counters may be 'local' or 'total' depending on where
+		 * they are in the topology. If The counter is on the L3, its
+		 * assumed to be 'local'. resctrl assumes both counters are on
+		 * the L3, resource, so 'local' is the only option for now.
+		 */
+		if (class->level == 3 && (has_csu || has_mbwu)) {
 			r->mon_capable = true;
 			exposed_mon_capable = true;
 
@@ -472,6 +499,9 @@ static int mpam_resctrl_resource_init(struct mpam_resctrl_res *res)
 			 * space.
 			 */
 			r->num_rmid = 1;
+
+			if (class_has_usable_mbwu(class))
+				mbm_local_class = class;
 		}
 	} else if (res->resctrl_res.rid == RDT_RESOURCE_MBA) {
 		struct mpam_props *cprops = &class->props;
