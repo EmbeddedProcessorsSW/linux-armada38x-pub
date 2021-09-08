@@ -174,6 +174,32 @@ struct mpam_component
 	struct mpam_class	*class;
 };
 
+struct mon_cfg {
+	u16     mon;
+	u8      pmg;
+	bool    match_pmg;
+	u32     partid;
+};
+
+
+/*
+ * Changes to enabled and cfg are protected by the msc->lock.
+ * Changes to prev_val and correction are protected by the msc's mon_sel_lock.
+ */
+struct msmon_mbwu_state {
+	bool		enabled;
+	struct mon_cfg	cfg;
+
+	/* The value last read from the hardware. Used to detect overflow. */
+	u64		prev_val;
+
+	/*
+	 * The value to add to the new reading to account for power management,
+	 * and shifts to trigger the overflow interrupt.
+	 */
+	u64		correction;
+};
+
 struct mpam_msc_ris
 {
 	u8			ris_idx;
@@ -192,13 +218,9 @@ struct mpam_msc_ris
 	/* parents: */
 	struct mpam_msc		*msc;
 	struct mpam_component	*comp;
-};
 
-struct mon_cfg {
-	u16     mon;
-	u8      pmg;
-	bool    match_pmg;
-	u32     partid;
+	/* msmon mbwu configuration is preserved over reset */
+	struct msmon_mbwu_state	*mbwu_state;
 };
 
 static inline int mpam_alloc_csu_mon(struct mpam_class *class)
