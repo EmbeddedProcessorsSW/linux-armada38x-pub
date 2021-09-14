@@ -251,6 +251,11 @@ struct iommu_ops {
 				      void *drvdata);
 	void (*sva_unbind)(struct iommu_sva *handle);
 	u32 (*sva_get_pasid)(struct iommu_sva *handle);
+	/* Per group IOMMU features */
+	int (*get_group_qos_params)(struct iommu_group *group, u16 *partition,
+				    u8 *perf_mon_grp);
+	int (*set_group_qos_params)(struct iommu_group *group, u16 partition,
+				    u8 perf_mon_grp);
 
 	int (*page_response)(struct device *dev,
 			     struct iommu_fault_event *evt,
@@ -429,6 +434,7 @@ extern void iommu_detach_device(struct iommu_domain *domain,
 extern int iommu_sva_unbind_gpasid(struct iommu_domain *domain,
 				   struct device *dev, ioasid_t pasid);
 extern struct iommu_domain *iommu_get_domain_for_dev(struct device *dev);
+extern struct iommu_domain *iommu_get_domain_for_group(struct iommu_group *group);
 extern struct iommu_domain *iommu_get_dma_domain(struct device *dev);
 extern int iommu_map(struct iommu_domain *domain, unsigned long iova,
 		     phys_addr_t paddr, size_t size, int prot);
