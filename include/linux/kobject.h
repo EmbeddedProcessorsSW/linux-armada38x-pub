@@ -205,6 +205,8 @@ static inline const struct kobj_type *get_ktype(struct kobject *kobj)
 
 extern struct kobject *kset_find_obj(struct kset *, const char *);
 
+struct kobject *kset_get_next_obj(struct kset *kset, struct kobject *prev);
+
 /* The global /sys/kernel/ kobject for people to chain off of */
 extern struct kobject *kernel_kobj;
 /* The global /sys/kernel/mm/ kobject for people to chain off of */
