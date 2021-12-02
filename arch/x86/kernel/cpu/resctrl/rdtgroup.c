@@ -1690,9 +1690,14 @@ static struct rftype *rdtgroup_get_rftype_by_name(const char *name)
 	return NULL;
 }
 
-void __init thread_throttle_mode_init(void)
+static void __init thread_throttle_mode_init(void)
 {
+	struct rdt_resource *r = resctrl_arch_get_resource(RDT_RESOURCE_MBA);
 	struct rftype *rft;
+
+	if (!r->alloc_capable ||
+	    r->membw.throttle_mode == THREAD_THROTTLE_UNDEFINED)
+		return;
 
 	rft = rdtgroup_get_rftype_by_name("thread_throttle_mode");
 	if (!rft)
@@ -3663,6 +3668,8 @@ int __init resctrl_init(void)
 	ret = resctrl_mon_resource_init();
 	if (ret)
 		return ret;
+
+	thread_throttle_mode_init();
 
 	ret = rdtgroup_setup_root();
 	if (ret)
