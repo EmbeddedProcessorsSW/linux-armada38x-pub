@@ -2313,19 +2313,26 @@ static struct platform_driver mpam_msc_driver = {
 };
 
 /*
- * MSC that are hidden under caches are not created as platform devices
+ * MSC that are hidden under caches/memory are not created as platform devices
  * as there is no cache driver. Caches are also special-cased in
  * get_msc_affinity().
  */
 static void mpam_dt_create_foundling_msc(void)
 {
 	int err;
-	struct device_node *cache;
+	struct device_node *cache, *memory;
 
 	for_each_compatible_node(cache, NULL, "cache") {
 		err = of_platform_populate(cache, mpam_of_match, NULL, NULL);
 		if (err) {
 			pr_err("Failed to create MSC devices under caches\n");
+		}
+	}
+
+        for_each_node_by_type(memory, "memory") {
+		err = of_platform_populate(memory, mpam_of_match, NULL, NULL);
+		if (err) {
+			pr_err("Failed to create MSC devices under memory controllers\n");
 		}
 	}
 }
