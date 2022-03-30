@@ -29,8 +29,8 @@
 #define CPRI_IP_AXI_INT(a)		(0x108ULL | a << 10)
 
 #define CPRI_MAX_MHAB		3
-#define CONNIP_MAX_INST		5
-#define CPRI_INT_MASK		0x1F
+#define CONNIP_MAX_INST		6
+#define CPRI_INT_MASK		0x3F
 
 typedef int (*connip_irq_cb_t)(uint32_t instance, uint32_t pss_int);
 
