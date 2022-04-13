@@ -46,9 +46,9 @@ struct nicpf {
 	void __iomem		*reg_base;       /* Register start address */
 	u8			num_sqs_en;	/* Secondary qsets enabled */
 	u64			nicvf[MAX_NUM_VFS_SUPPORTED];
+#define	NIC_VF_UNASSIGNED	((u8)0xFF)
 	u8			vf_sqs[MAX_NUM_VFS_SUPPORTED][MAX_SQS_PER_VF];
 	u8			pqs_vf[MAX_NUM_VFS_SUPPORTED];
-	bool			sqs_used[MAX_NUM_VFS_SUPPORTED];
 	struct pkind_cfg	pkind;
 #define	NIC_SET_VF_LMAC_MAP(bgx, lmac)	(((bgx & 0xF) << 4) | (lmac & 0xF))
 #define	NIC_GET_BGX_FROM_VF_LMAC_MAP(map)	((map >> 4) & 0xF)
@@ -56,6 +56,7 @@ struct nicpf {
 	u8			*vf_lmac_map;
 	u16			cpi_base[MAX_NUM_VFS_SUPPORTED];
 	u16			rssi_base[MAX_NUM_VFS_SUPPORTED];
+	struct pci_dev		*vf_pdev[MAX_NUM_VFS_SUPPORTED];
 
 	/* MSI-X */
 	u8			num_vec;
@@ -584,10 +585,18 @@ static void nic_config_rss(struct nicpf *nic, struct rss_cfg_msg *cfg)
 	for (; rssi < (rssi_base + cfg->tbl_len); rssi++) {
 		u8 svf = cfg->ind_tbl[idx] >> 3;
 
-		if (svf)
+		if (svf && svf <= MAX_SQS_PER_VF) {
 			qset = nic->vf_sqs[cfg->vf_id][svf - 1];
-		else
+			if (qset >= MAX_NUM_VFS_SUPPORTED ||
+			    nic->pqs_vf[qset] != cfg->vf_id) {
+				dev_err(&nic->pdev->dev,
+					"Invalid rss table entry %d from VF %d\n",
+					cfg->ind_tbl[idx], cfg->vf_id);
+				qset = cfg->vf_id;
+			}
+		} else {
 			qset = cfg->vf_id;
+		}
 		nic_reg_write(nic, NIC_PF_RSSI_0_4097_RQ | (rssi << 3),
 			      (qset << 3) | (cfg->ind_tbl[idx] & 0x7));
 		idx++;
@@ -715,7 +724,19 @@ static void nic_send_pnicvf(struct nicpf *nic, int sqs)
 static void nic_send_snicvf(struct nicpf *nic, struct nicvf_ptr *nicvf)
 {
 	union nic_mbx mbx = {};
-	int sqs_id = nic->vf_sqs[nicvf->vf_id][nicvf->sqs_id];
+	int sqs_id;
+
+	if (nicvf->sqs_id >= MAX_SQS_PER_VF) {
+		nic_mbx_send_nack(nic, nicvf->vf_id);
+		return;
+	}
+
+	sqs_id = nic->vf_sqs[nicvf->vf_id][nicvf->sqs_id];
+	if (sqs_id < nic->num_vf_en ||
+	    nic->pqs_vf[sqs_id] != nicvf->vf_id) {
+		nic_mbx_send_nack(nic, nicvf->vf_id);
+		return;
+	}
 
 	mbx.nicvf.msg = NIC_MBOX_MSG_SNICVF_PTR;
 	mbx.nicvf.sqs_id = nicvf->sqs_id;
@@ -723,47 +744,152 @@ static void nic_send_snicvf(struct nicpf *nic, struct nicvf_ptr *nicvf)
 	nic_send_msg_to_vf(nic, nicvf->vf_id, &mbx);
 }
 
+#ifdef CONFIG_PCI_IOV
+/* Find and take reference to all vf devices */
+static void nic_get_vf_pdev(struct nicpf *nic, int vf_en)
+{
+	struct pci_dev *pdev = nic->pdev;
+	struct pci_dev *vfdev;
+	u16 vid = pdev->vendor;
+	u16 devid;
+	int vf = 0, pos;
+
+	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_SRIOV);
+	if (!pos)
+		return;
+	pci_read_config_word(pdev, pos + PCI_SRIOV_VF_DID, &devid);
+
+	vfdev = pci_get_device(vid, devid, NULL);
+	for (; vfdev; vfdev = pci_get_device(vid, devid, vfdev)) {
+		if (!vfdev->is_virtfn)
+			continue;
+		if (vfdev->physfn != pdev)
+			continue;
+		if (vf >= vf_en)
+			continue;
+		nic->vf_pdev[vf] = vfdev;
+		pci_dev_get(vfdev);
+		++vf;
+	}
+}
+#endif
+
+/* Release references to all vf devices */
+static void nic_put_vf_pdev(struct nicpf *nic)
+{
+	int vf;
+
+	for (vf = 0; vf < MAX_NUM_VFS_SUPPORTED; vf++) {
+		struct pci_dev *vfdev = nic->vf_pdev[vf];
+
+		nic->vf_pdev[vf] = NULL;
+		if (vfdev)
+			pci_dev_put(vfdev);
+	}
+}
+
+/* Check if pri.VF and sec.VF are in same domain i.e bound to same driver */
+static bool nic_check_svf_drv(struct nicpf *nic, u8 pvf, u8 svf)
+{
+	return pci_dev_driver(nic->vf_pdev[pvf]) ==
+	       pci_dev_driver(nic->vf_pdev[svf]);
+}
+
 /* Find next available Qset that can be assigned as a
  * secondary Qset to a VF.
  */
-static int nic_nxt_avail_sqs(struct nicpf *nic)
+static int nic_nxt_avail_sqs(struct nicpf *nic, u8 pvf)
 {
 	int sqs;
 
-	for (sqs = 0; sqs < nic->num_sqs_en; sqs++) {
-		if (!nic->sqs_used[sqs])
-			nic->sqs_used[sqs] = true;
+	for (sqs = nic->num_vf_en;
+	     sqs < (nic->num_vf_en + nic->num_sqs_en); sqs++) {
+		if (nic->pqs_vf[sqs] == NIC_VF_UNASSIGNED &&
+		    nic_check_svf_drv(nic, pvf, sqs))
+			nic->pqs_vf[sqs] = pvf;
 		else
 			continue;
-		return sqs + nic->num_vf_en;
+		return sqs;
 	}
 	return -1;
 }
 
 /* Allocate additional Qsets for requested VF */
-static void nic_alloc_sqs(struct nicpf *nic, struct sqs_alloc *sqs)
+static void nic_alloc_sqs(struct nicpf *nic, u8 pvf, struct sqs_alloc *sqs)
 {
 	union nic_mbx mbx = {};
 	int idx, alloc_qs = 0;
 	int sqs_id;
 
-	if (!nic->num_sqs_en)
+	if (!nic->num_sqs_en || sqs->qs_count > MAX_SQS_PER_VF)
 		goto send_mbox;
 
-	for (idx = 0; idx < sqs->qs_count; idx++) {
-		sqs_id = nic_nxt_avail_sqs(nic);
-		if (sqs_id < 0)
-			break;
-		nic->vf_sqs[sqs->vf_id][idx] = sqs_id;
-		nic->pqs_vf[sqs_id] = sqs->vf_id;
-		alloc_qs++;
+	if (sqs->spec) {
+		for (idx = 0; idx < sqs->qs_count; idx++) {
+			sqs_id = sqs->svf[idx];
+
+			/* Check if desired SQS is within the allowed range */
+			if (!(sqs_id >= nic->num_vf_en &&
+			      (sqs_id < (nic->num_vf_en + nic->num_sqs_en)))) {
+				dev_err(&nic->pdev->dev,
+					"Req SQS is invalid sqs->svf[%d]=%u",
+					idx, sqs_id);
+				break;
+			}
+
+			/* Check if desired SQS is free or assigned to a PVF */
+			if (nic->pqs_vf[sqs_id] != NIC_VF_UNASSIGNED &&
+			    nic->pqs_vf[sqs_id] != pvf) {
+				dev_err(&nic->pdev->dev,
+					"SQS%d is already allocated to VF%u",
+					sqs_id, nic->pqs_vf[sqs_id]);
+				break;
+			}
+
+			/* Check if SQS is bound to the same driver as PVF */
+			if (!nic_check_svf_drv(nic, pvf, sqs_id)) {
+				dev_err(&nic->pdev->dev,
+					"SQS%d use different driver", sqs_id);
+				break;
+			}
+		}
+
+		if (idx != sqs->qs_count)
+			goto send_mbox;
+
+		/* Clear any existing assignments */
+		for (idx = 0; idx < MAX_SQS_PER_VF; idx++)
+			nic->vf_sqs[pvf][idx] = NIC_VF_UNASSIGNED;
+		for (idx = nic->num_vf_en;
+		     idx < (nic->num_vf_en + nic->num_sqs_en); idx++) {
+			if (nic->pqs_vf[idx] == pvf)
+				nic->pqs_vf[idx] = NIC_VF_UNASSIGNED;
+		}
+
+		/* Populate VF's SQS table */
+		for (idx = 0; idx < sqs->qs_count; idx++) {
+			sqs_id = sqs->svf[idx];
+			nic->vf_sqs[pvf][idx] = sqs_id;
+			nic->pqs_vf[sqs_id] = pvf;
+			mbx.sqs_alloc.svf[idx] = sqs_id;
+		}
+		alloc_qs = idx;
+	} else {
+		for (idx = 0; idx < sqs->qs_count; idx++) {
+			sqs_id = nic_nxt_avail_sqs(nic, pvf);
+			if (sqs_id < 0)
+				break;
+			nic->vf_sqs[pvf][idx] = sqs_id;
+			nic->pqs_vf[sqs_id] = pvf;
+			mbx.sqs_alloc.svf[idx] = sqs_id;
+		}
+		alloc_qs = idx;
 	}
 
 send_mbox:
 	mbx.sqs_alloc.msg = NIC_MBOX_MSG_ALLOC_SQS;
-	mbx.sqs_alloc.vf_id = sqs->vf_id;
 	mbx.sqs_alloc.qs_count = alloc_qs;
-	nic_send_msg_to_vf(nic, sqs->vf_id, &mbx);
+	nic_send_msg_to_vf(nic, pvf, &mbx);
 }
 
 static int nic_config_loopback(struct nicpf *nic, struct set_loopback *lbk)
@@ -1064,13 +1190,15 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
 		break;
 	case NIC_MBOX_MSG_SHUTDOWN:
 		/* First msg in VF teardown sequence */
-		if (vf >= nic->num_vf_en)
-			nic->sqs_used[vf - nic->num_vf_en] = false;
-		nic->pqs_vf[vf] = 0;
+		if (vf < nic->num_vf_en) {
+			for (i = 0; i < MAX_SQS_PER_VF; i++)
+				nic->vf_sqs[vf][i] = NIC_VF_UNASSIGNED;
+		}
+		nic->pqs_vf[vf] = NIC_VF_UNASSIGNED;
 		nic_enable_vf(nic, vf, false);
 		break;
 	case NIC_MBOX_MSG_ALLOC_SQS:
-		nic_alloc_sqs(nic, &mbx.sqs_alloc);
+		nic_alloc_sqs(nic, vf, &mbx.sqs_alloc);
 		return;
 	case NIC_MBOX_MSG_NICVF_PTR:
 		nic->nicvf[vf] = mbx.nicvf.nicvf;
@@ -1290,6 +1418,10 @@ static int nic_sriov_init(struct pci_dev *pdev, struct nicpf *nic)
 		return err;
 	}
 
+#ifdef CONFIG_PCI_IOV
+	nic_get_vf_pdev(nic, vf_en);
+#endif
+
 	dev_info(&pdev->dev, "SRIOV enabled, number of VF available %d\n",
 		 vf_en);
 
@@ -1302,7 +1434,7 @@ static int nic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	struct device *dev = &pdev->dev;
 	struct nicpf *nic;
 	u8     max_lmac;
-	int    err;
+	int    err, vf, sqs;
 
 	BUILD_BUG_ON(sizeof(union nic_mbx) > 16);
 
@@ -1363,6 +1495,13 @@ static int nic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	nic_set_lmac_vf_mapping(nic);
 
+	/* Initialize all VF's primary Qset */
+	for (vf = 0; vf < MAX_NUM_VFS_SUPPORTED; vf++) {
+		nic->pqs_vf[vf] = NIC_VF_UNASSIGNED;
+		for (sqs = 0; sqs < MAX_SQS_PER_VF; sqs++)
+			nic->vf_sqs[vf][sqs] = NIC_VF_UNASSIGNED;
+	}
+
 	/* Register interrupts */
 	err = nic_register_interrupts(nic);
 	if (err)
@@ -1392,8 +1531,10 @@ static void nic_remove(struct pci_dev *pdev)
 	if (!nic)
 		return;
 
-	if (nic->flags & NIC_SRIOV_ENABLED)
+	if (nic->flags & NIC_SRIOV_ENABLED) {
+		nic_put_vf_pdev(nic);
 		pci_disable_sriov(pdev);
+	}
 
 	nic_unregister_interrupts(nic);
 	pci_release_regions(pdev);

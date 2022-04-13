@@ -410,7 +410,7 @@ static void nicvf_request_sqs(struct nicvf *nic)
 		return;
 
 	mbx.sqs_alloc.msg = NIC_MBOX_MSG_ALLOC_SQS;
-	mbx.sqs_alloc.vf_id = nic->vf_id;
+	mbx.sqs_alloc.spec = 0; /* Let PF choose which SQS to alloc */
 	mbx.sqs_alloc.qs_count = nic->sqs_count;
 	if (nicvf_send_msg_to_pf(nic, &mbx)) {
 		/* No response from PF */

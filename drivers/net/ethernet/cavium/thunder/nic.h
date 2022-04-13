@@ -514,11 +514,12 @@ struct bgx_link_status {
 	u32   speed;
 };
 
-/* Get Extra Qset IDs */
+/* Allocate additional SQS to VF */
 struct sqs_alloc {
 	u8    msg;
-	u8    vf_id;
+	u8    spec; /* 1 - For specific SQS allocation, 0 - For PF's choice */
 	u8    qs_count;
+	u8    svf[MAX_SQS_PER_VF]; /* SQS VF ids for specific allocation */
 };
 
 struct nicvf_ptr {
