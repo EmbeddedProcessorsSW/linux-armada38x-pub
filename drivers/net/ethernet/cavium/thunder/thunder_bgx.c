@@ -1373,7 +1373,7 @@ static void bgx_lmac_disable(struct bgx *bgx, u8 lmacid)
 
 static void bgx_init_hw(struct bgx *bgx)
 {
-	int i;
+	int i, pkind_idx;
 	struct lmac *lmac;
 
 	bgx_reg_modify(bgx, 0, BGX_CMR_GLOBAL_CFG, CMR_GLOBAL_CFG_FCS_STRIP);
@@ -1385,6 +1385,11 @@ static void bgx_init_hw(struct bgx *bgx)
 		lmac = &bgx->lmac[i];
 		bgx_reg_write(bgx, i, BGX_CMRX_CFG,
 			      (lmac->lmac_type << 8) | lmac->lane_to_sds);
+
+		/* Set PKIND for this LMAC */
+		pkind_idx = (bgx->bgx_id * MAX_LMAC_PER_BGX) + lmac->lmacid;
+		bgx_reg_write(bgx, i, BGX_CMRX_RX_ID_MAP, pkind_idx & 0x3F);
+
 		bgx->lmac[i].lmacid_bd = lmac_count;
 		lmac_count++;
 	}

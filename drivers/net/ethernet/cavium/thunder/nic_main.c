@@ -253,7 +253,7 @@ static void nic_get_bgx_stats(struct nicpf *nic, struct bgx_stats_msg *bgx)
 static int nic_update_hw_frs(struct nicpf *nic, int new_frs, int vf)
 {
 	int bgx, lmac, lmac_cnt;
-	u64 lmac_credits;
+	u64 lmac_credits, pkind_val;
 
 	if ((new_frs > NIC_HW_MAX_FRS) || (new_frs < NIC_HW_MIN_FRS))
 		return 1;
@@ -277,6 +277,12 @@ static int nic_update_hw_frs(struct nicpf *nic, int new_frs, int vf)
 	if (!pass1_silicon(nic->pdev))
 		nic_reg_write(nic,
 			      NIC_PF_LMAC_0_7_CFG2 + (lmac * 8), new_frs);
+
+	/* Set max receive packet size also to MTU */
+	pkind_val = nic_reg_read(nic, NIC_PF_PKIND_0_15_CFG | (lmac << 3));
+	((struct pkind_cfg *)&pkind_val)->maxlen = new_frs;
+	nic_reg_write(nic, NIC_PF_PKIND_0_15_CFG | (lmac << 3), pkind_val);
+
 	return 0;
 }
 
