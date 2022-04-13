@@ -910,6 +910,7 @@ static void nicvf_snd_queue_config(struct nicvf *nic, struct queue_set *qs,
 		netif_set_xps_queue(nic->netdev,
 				    &sq->affinity_mask, qidx);
 	}
+	spin_lock_init(&sq->lock);
 }
 
 /* Configures receive buffer descriptor ring */
@@ -1469,7 +1470,6 @@ static inline void nicvf_sq_doorbell(struct nicvf *nic, struct sk_buff *skb,
 	txq = netdev_get_tx_queue(nic->pnicvf->netdev,
 				  skb_get_queue_mapping(skb));
 
-	netdev_tx_sent_queue(txq, skb->len);
 
 	/* make sure all memory stores are done before ringing doorbell */
 	smp_wmb();
@@ -1549,11 +1549,12 @@ static int nicvf_sq_append_tso(struct nicvf *nic, struct snd_queue *sq,
 int nicvf_sq_append_skb(struct nicvf *nic, struct snd_queue *sq,
 			struct sk_buff *skb, u8 sq_num)
 {
-	int i, size;
+	int i, size, ret = 0;
 	int subdesc_cnt, hdr_sqe = 0;
 	int qentry;
 	u64 dma_addr;
 
+	spin_lock_bh(&sq->lock);
 	subdesc_cnt = nicvf_sq_subdesc_required(nic, skb);
 	if (subdesc_cnt > atomic_read(&sq->free_cnt))
 		goto append_fail;
@@ -1561,8 +1562,10 @@ int nicvf_sq_append_skb(struct nicvf *nic, struct snd_queue *sq,
 	qentry = nicvf_get_sq_desc(sq, subdesc_cnt);
 
 	/* Check if its a TSO packet */
-	if (skb_shinfo(skb)->gso_size && !nic->hw_tso)
-		return nicvf_sq_append_tso(nic, sq, sq_num, qentry, skb);
+	if (skb_shinfo(skb)->gso_size && !nic->hw_tso) {
+		ret = nicvf_sq_append_tso(nic, sq, sq_num, qentry, skb);
+		goto unlock_exit;
+	}
 
 	/* Add SQ header subdesc */
 	nicvf_sq_add_hdr_subdesc(nic, sq, qentry, subdesc_cnt - 1,
@@ -1578,7 +1581,7 @@ int nicvf_sq_append_skb(struct nicvf *nic, struct snd_queue *sq,
 				      DMA_TO_DEVICE, DMA_ATTR_SKIP_CPU_SYNC);
 	if (dma_mapping_error(&nic->pdev->dev, dma_addr)) {
 		nicvf_rollback_sq_desc(sq, qentry, subdesc_cnt);
-		return 0;
+		goto unlock_exit;
 	}
 
 	nicvf_sq_add_gather_subdesc(sq, qentry, size, dma_addr);
@@ -1603,7 +1606,7 @@ int nicvf_sq_append_skb(struct nicvf *nic, struct snd_queue *sq,
 			 */
 			nicvf_unmap_sndq_buffers(nic, sq, hdr_sqe, i);
 			nicvf_rollback_sq_desc(sq, qentry, subdesc_cnt);
-			return 0;
+			goto unlock_exit;
 		}
 		nicvf_sq_add_gather_subdesc(sq, qentry, size, dma_addr);
 	}
@@ -1615,14 +1618,16 @@ doorbell:
 	}
 
 	nicvf_sq_doorbell(nic, skb, sq_num, subdesc_cnt);
-
+	spin_unlock_bh(&sq->lock);
 	return 1;
 
 append_fail:
 	/* Use original PCI dev for debug log */
 	nic = nic->pnicvf;
 	netdev_dbg(nic->netdev, "Not enough SQ descriptors to xmit pkt\n");
-	return 0;
+unlock_exit:
+	spin_unlock_bh(&sq->lock);
+	return ret;
 }
 
 static inline unsigned frag_num(unsigned i)
@@ -1837,9 +1842,15 @@ void nicvf_update_sq_stats(struct nicvf *nic, int sq_idx)
 /* Check for errors in the receive cmp.queue entry */
 int nicvf_check_cqe_rx_errs(struct nicvf *nic, struct cqe_rx_t *cqe_rx)
 {
-	netif_err(nic, rx_err, nic->netdev,
-		  "RX error CQE err_level 0x%x err_opcode 0x%x\n",
-		  cqe_rx->err_level, cqe_rx->err_opcode);
+	/* "Disable" packet parsing in promiscuos mode.*/
+	if (nic->netdev->flags & IFF_PROMISC)
+		return 0;
+
+	if (netif_msg_rx_err(nic))
+		netdev_err(nic->netdev,
+			   "%s: RX error CQE err_level 0x%x err_opcode 0x%x\n",
+			   nic->netdev->name,
+			   cqe_rx->err_level, cqe_rx->err_opcode);
 
 	switch (cqe_rx->err_opcode) {
 	case CQ_RX_ERROP_RE_PARTIAL:

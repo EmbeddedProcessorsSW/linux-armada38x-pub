@@ -72,6 +72,9 @@ module_param(cpi_alg, int, 0444);
 MODULE_PARM_DESC(cpi_alg,
 		 "PFC algorithm (0=none, 1=VLAN, 2=VLAN16, 3=IP Diffserv)");
 
+static struct net_device *netdev_lbk0;
+static struct net_device *netdev_ethx[NIC_MAX_PKIND];
+
 static inline u8 nicvf_netdev_qidx(struct nicvf *nic, u8 qidx)
 {
 	if (nic->sqs_mode)
@@ -289,6 +292,11 @@ static void  nicvf_handle_mbx_intr(struct nicvf *nic)
 		nic->pfc.autoneg = mbx.pfc.autoneg;
 		nic->pfc.fc_rx = mbx.pfc.fc_rx;
 		nic->pfc.fc_tx = mbx.pfc.fc_tx;
+		nic->pf_acked = true;
+		break;
+	case NIC_MBOX_MSG_PORT_CTX:
+		nic->port_ctx = mbx.ctx.ctx;
+		nic->port_dp_idx = mbx.ctx.dp_idx;
 		nic->pf_acked = true;
 		break;
 	default:
@@ -768,6 +776,49 @@ static inline void nicvf_set_rxtstamp(struct nicvf *nic, struct sk_buff *skb)
 	__skb_pull(skb, 8);
 }
 
+static struct net_device *rcv_pkt_reroute(struct net_device *netdev,
+					  struct sk_buff *skb,
+					  struct nicvf **nic)
+{
+	struct nicvf *snic = *nic;
+	struct pkt_tmhdr *tmh;
+	u8 ifx;
+
+	/* Drop packets coming from BGX interfaces.*/
+	if (!snic->lbk_mode)
+		return NULL;
+	/* Use Tunnelling Meta Header (TMH) to determine the destination
+	 * interface. The current implementation of packet routing assumes,
+	 * that TMH is located at the beginning (prepending) of the packet.
+	 * NOTE: Routing customization is possible here.
+	 * The default routing -- packets go ethX pointed by tmh.dmac[5].
+	 * This needs be be coordinated with the Dataplane program.
+	 */
+	tmh = (struct pkt_tmhdr *)skb->data;
+	ifx = tmh->dmac[5];
+	if (ntohs(tmh->etype) != PKT_TMH_TYPE ||
+	    (ifx >= NIC_MAX_PKIND && ifx != LBK_IF_IDX))
+		return NULL;
+
+	/* Strip TMH, if requested.*/
+	if (tmh->flags & PKT_TMH_FLAG_STRIP)
+		skb_pull(skb, sizeof(struct pkt_tmhdr));
+
+	/* Do not change SKB and netdev, if packet goes to lbk0.*/
+	if (ifx == LBK_IF_IDX)
+		return netdev;
+
+	netdev = netdev_ethx[ifx];
+	snic = netdev_priv(netdev);
+	/* Drop packet, if destination interface belongs to Linux context.*/
+	if (snic->port_ctx == NIC_PORT_CTX_LINUX)
+		return NULL;
+	/* Update SKB and netdev.*/
+	skb->dev = netdev;
+	*nic = snic;
+	return netdev;
+}
+
 static void nicvf_rcv_pkt_handler(struct net_device *netdev,
 				  struct napi_struct *napi,
 				  struct cqe_rx_t *cqe_rx,
@@ -803,7 +854,6 @@ static void nicvf_rcv_pkt_handler(struct net_device *netdev,
 		skb = nicvf_get_rcv_skb(snic, cqe_rx,
 					nic->xdp_prog ? true : false);
 	}
-
 	if (!skb)
 		return;
 
@@ -812,17 +862,21 @@ static void nicvf_rcv_pkt_handler(struct net_device *netdev,
 		print_hex_dump(KERN_INFO, "", DUMP_PREFIX_OFFSET, 16, 1,
 			       skb->data, skb->len, true);
 	}
+	if (err)
+		goto drop;
 
-	/* If error packet, drop it here */
-	if (err) {
-		dev_kfree_skb_any(skb);
-		return;
+	/* Reroute RX packets, if interface belongs to Dataplane. */
+	if (nic->port_ctx == NIC_PORT_CTX_DATAPLANE) {
+		/* Reroute packets arriving from LBK to ethX or lbk0. */
+		netdev = rcv_pkt_reroute(netdev, skb, &nic);
+		if (!netdev)
+			goto drop;
 	}
-
 	nicvf_set_rxtstamp(nic, skb);
 	nicvf_set_rxhash(netdev, cqe_rx, skb);
 
 	skb_record_rx_queue(skb, rq_idx);
+
 	if (netdev->hw_features & NETIF_F_RXCSUM) {
 		/* HW by default verifies TCP/UDP/SCTP checksums */
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
@@ -841,6 +895,9 @@ static void nicvf_rcv_pkt_handler(struct net_device *netdev,
 		napi_gro_receive(napi, skb);
 	else
 		netif_receive_skb(skb);
+	return;
+drop:
+	dev_kfree_skb_any(skb);
 }
 
 static int nicvf_cq_intr_handler(struct net_device *netdev, u8 cq_idx,
@@ -935,8 +992,6 @@ done:
 	    (atomic_read(&sq->free_cnt) >= MIN_SQ_DESC_PER_PKT_XMIT)) {
 		netdev = nic->pnicvf->netdev;
 		txq = netdev_get_tx_queue(netdev, txq_idx);
-		if (tx_pkts)
-			netdev_tx_completed_queue(txq, tx_pkts, tx_bytes);
 
 		/* To read updated queue and carrier status */
 		smp_mb();
@@ -1249,20 +1304,57 @@ static int nicvf_register_misc_interrupt(struct nicvf *nic)
 	return 0;
 }
 
+static struct net_device *snd_pkt_reroute(struct net_device *netdev,
+					  struct sk_buff *skb,
+					  struct nicvf **nic)
+{
+	struct pkt_tmhdr *tmh;
+
+	if (!netdev_lbk0)
+		return NULL;
+	/* Add and initialize Tunnelling Meta Header (TMH),
+	 * if not already present.
+	 * NOTE: Usage of TMH needs to be coordinated with Dataplane program,
+	 * which processes this packet.
+	 */
+	tmh = (struct pkt_tmhdr *)skb->data;
+	if (ntohs(tmh->etype) != PKT_TMH_TYPE) {
+		tmh = (struct pkt_tmhdr *)skb_push(skb,
+						   sizeof(struct pkt_tmhdr));
+		tmh->dmac[5] = (*nic)->port_dp_idx;
+		tmh->etype = htons(PKT_TMH_TYPE);
+		tmh->flags = 0;
+	}
+	/* Update SKB and netdev.*/
+	*nic = netdev_priv(netdev_lbk0);
+	skb->dev = netdev_lbk0;
+	return netdev_lbk0;
+}
+
 static netdev_tx_t nicvf_xmit(struct sk_buff *skb, struct net_device *netdev)
 {
 	struct nicvf *nic = netdev_priv(netdev);
-	int qid = skb_get_queue_mapping(skb);
-	struct netdev_queue *txq = netdev_get_tx_queue(netdev, qid);
+	struct netdev_queue *txq;
 	struct nicvf *snic;
 	struct snd_queue *sq;
-	int tmp;
+	int qid, tmp;
 
 	/* Check for minimum packet length */
 	if (skb->len <= ETH_HLEN) {
 		dev_kfree_skb(skb);
 		return NETDEV_TX_OK;
 	}
+	/* Reroute packets from ethX, if interface belongs to Dataplane.*/
+	if (!nic->lbk_mode && nic->port_ctx == NIC_PORT_CTX_DATAPLANE) {
+		/* Use LBK media */
+		netdev = snd_pkt_reroute(netdev, skb, &nic);
+		if (!netdev) {
+			dev_kfree_skb(skb);
+			return NETDEV_TX_OK;
+		}
+	}
+	snic = nic;
+	qid = skb_get_queue_mapping(skb);
 
 	/* In XDP case, initial HW tx queues are used for XDP,
 	 * but stack's queue mapping starts at '0', so skip the
@@ -1271,7 +1363,6 @@ static netdev_tx_t nicvf_xmit(struct sk_buff *skb, struct net_device *netdev)
 	if (nic->xdp_prog)
 		qid += nic->xdp_tx_queues;
 
-	snic = nic;
 	/* Get secondary Qset's SQ structure */
 	if (qid >= MAX_SND_QUEUES_PER_QS) {
 		tmp = qid / MAX_SND_QUEUES_PER_QS;
@@ -1287,8 +1378,11 @@ static netdev_tx_t nicvf_xmit(struct sk_buff *skb, struct net_device *netdev)
 	}
 
 	sq = &snic->qs->sq[qid];
-	if (!netif_tx_queue_stopped(txq) &&
-	    !nicvf_sq_append_skb(snic, sq, skb, qid)) {
+	txq = netdev_get_tx_queue(netdev, qid);
+
+	if (netif_tx_queue_stopped(txq)) {
+		dev_kfree_skb(skb);
+	} else if (!nicvf_sq_append_skb(snic, sq, skb, qid)) {
 		netif_tx_stop_queue(txq);
 
 		/* Barrier, so that stop_queue visible to other cpus */
@@ -1304,7 +1398,6 @@ static netdev_tx_t nicvf_xmit(struct sk_buff *skb, struct net_device *netdev)
 		}
 		return NETDEV_TX_BUSY;
 	}
-
 	return NETDEV_TX_OK;
 }
 
@@ -2100,6 +2193,7 @@ static int nicvf_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	struct net_device *netdev;
 	struct nicvf *nic;
 	int    err, qcount;
+	long   i;
 	u16    sdevid;
 	struct cavium_ptp *ptp_clock;
 
@@ -2220,6 +2314,7 @@ static int nicvf_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	netdev->netdev_ops = &nicvf_netdev_ops;
 	netdev->watchdog_timeo = NICVF_TX_TIMEOUT;
+	netdev->needed_headroom = 128;
 
 	/* MTU range: 64 - 9200 */
 	netdev->min_mtu = NIC_HW_MIN_FRS;
@@ -2244,7 +2339,6 @@ static int nicvf_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 			goto err_unregister_interrupts;
 		netdev->hw_features &= ~NETIF_F_LOOPBACK;
 	}
-
 	err = register_netdev(netdev);
 	if (err) {
 		dev_err(dev, "Failed to register netdevice\n");
@@ -2252,9 +2346,17 @@ static int nicvf_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 
 	nic->msg_enable = debug;
-
 	nicvf_set_ethtool_ops(netdev);
 
+	if (nic->lbk_mode) {
+		netdev_lbk0 = netdev;
+		nic->port_ctx = NIC_PORT_CTX_DATAPLANE;
+		nic->port_dp_idx = LBK_IF_IDX;
+	} else {
+		err = kstrtol(netdev->name + 3, 10, &i); /* ethX */
+		if (!err && i < NIC_MAX_PKIND)
+			netdev_ethx[i] = netdev;
+	}
 	return 0;
 
 err_destroy_workqueue:
@@ -2320,6 +2422,7 @@ static struct pci_driver nicvf_driver = {
 static int __init nicvf_init_module(void)
 {
 	pr_info("%s, ver %s\n", DRV_NAME, DRV_VERSION);
+	netdev_lbk0 = NULL;
 	return pci_register_driver(&nicvf_driver);
 }
 

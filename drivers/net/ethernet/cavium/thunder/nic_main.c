@@ -156,6 +156,29 @@ static void nic_send_msg_to_vf(struct nicpf *nic, int vf, union nic_mbx *mbx)
 	}
 }
 
+/* NIC PF control and configuraiton block. */
+static struct nicpf *nicpf_ctl;
+
+void nic_bgx_port_ctx_set(int node, int bgx, int lmac, int ctx, int dp_idx)
+{
+	int vf;
+	union nic_mbx mbx = {};
+	struct nicpf *nic = nicpf_ctl;
+	u8 bgxlmac = NIC_SET_VF_LMAC_MAP(bgx, lmac);
+
+	for (vf = 0; vf < nic->num_vf_en; vf++) {
+		if (nic->vf_enabled[vf] && nic->vf_lmac_map[vf] == bgxlmac) {
+			mbx.ctx.msg = NIC_MBOX_MSG_PORT_CTX;
+			mbx.ctx.vf_id = vf;
+			mbx.ctx.ctx = ctx;
+			mbx.ctx.dp_idx = dp_idx;
+			nic_send_msg_to_vf(nic, vf, &mbx);
+			break;
+		}
+	}
+}
+EXPORT_SYMBOL(nic_bgx_port_ctx_set);
+
 #define LBK_PKIND 15
 
 static u8 lbk_link_up;
@@ -167,13 +190,11 @@ static int nic_get_lbk_port_pkind(void)
 
 static int nic_start_lbk_port(void)
 {
-	lbk_link_up = 1;
 	return 0;
 }
 
 static void nic_stop_lbk_port(void)
 {
-	lbk_link_up = 0;
 }
 
 struct thunder_lbk_com_s thunder_lbk_com = {
@@ -224,6 +245,8 @@ static void nic_create_lbk_interface(struct nicpf *nic)
 
 	nic_reg_write(nic, NIC_PF_LMAC_0_7_CREDIT +
 			(NIC_LBK_PKIO_LMAC * 8), lmac_credit);
+	/* LBK link is always up. */
+	lbk_link_up = 1;
 }
 
 /* Responds to VF's READY message with VF's
@@ -244,7 +267,6 @@ static void nic_mbx_send_ready(struct nicpf *nic, int vf)
 
 		bgx_idx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
 		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
-
 		mac = bgx_get_lmac_mac(nic->node, bgx_idx, lmac);
 		if (mac)
 			ether_addr_copy((u8 *)&mbx.nic_cfg.mac_addr, mac);
@@ -1614,11 +1636,15 @@ static int nic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (err)
 		goto err_release_regions;
 
+	/* Set port context */
+	bgx_init_ctx_set_cb(nic_bgx_port_ctx_set);
+
 	/* Configure SRIOV */
 	err = nic_sriov_init(pdev, nic);
 	if (err)
 		goto err_unregister_interrupts;
 
+	nicpf_ctl = nic;
 	return 0;
 
 err_unregister_interrupts:

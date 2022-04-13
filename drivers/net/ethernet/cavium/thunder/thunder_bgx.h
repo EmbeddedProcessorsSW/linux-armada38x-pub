@@ -232,6 +232,7 @@ const u8 *bgx_get_lmac_mac(int node, int bgx_idx, int lmacid);
 void bgx_set_lmac_mac(int node, int bgx_idx, int lmacid, const u8 *mac);
 void bgx_get_lmac_link_state(int node, int bgx_idx, int lmacid, void *status);
 int bgx_set_lmac_link_state(int node, int bgx_idx, int lmacid, bool enable);
+void bgx_init_ctx_set_cb(const void *cb);
 void bgx_lmac_internal_loopback(int node, int bgx_idx,
 				int lmac_idx, bool enable);
 void bgx_config_timestamping(int node, int bgx_idx, int lmacid, bool enable);

@@ -293,6 +293,8 @@ struct nicvf {
 	bool                    sqs_mode;
 	bool			hw_tso;
 	bool			t88;
+	u8			port_ctx;
+	u8			port_dp_idx;
 
 	/* Receive buffer alloc */
 	u32			rb_page_offset;
@@ -423,6 +425,7 @@ struct nicvf {
 #define	NIC_MBOX_MSG_RESET_STAT_COUNTER 0x17	/* Reset statistics counters */
 #define	NIC_MBOX_MSG_PFC		0x18	/* Pause frame control */
 #define	NIC_MBOX_MSG_PTP_CFG		0x19	/* HW packet timestamp */
+#define	NIC_MBOX_MSG_PORT_CTX		0x20	/* Change port oper.context */
 #define	NIC_MBOX_MSG_CFG_DONE		0xF0	/* VF configuration done */
 #define	NIC_MBOX_MSG_SHUTDOWN		0xF1	/* VF is being shutdown */
 #define	NIC_MBOX_MSG_RESET_XCAST	0xF2    /* Reset DCAM filtering mode */
@@ -545,6 +548,33 @@ struct set_loopback {
 	bool  enable;
 };
 
+#define NIC_PORT_CTX_LINUX	0 /* Control plane/Linux */
+#define NIC_PORT_CTX_DATAPLANE	1 /* Data plane */
+
+#define LBK_IF_IDX	0xff /* LBK virtual port index */
+
+struct port_context {
+	u8    msg;
+	u8    vf_id;
+	u8    ctx;
+	u8    dp_idx;
+};
+
+/* Packet tunnelling 32-bytes meta block (Ethernet header + meta data).
+ * It needs to be consistent with Dataplane version of this structure.
+ */
+#define PKT_TMH_TYPE		0x0770
+#define PKT_TMH_FLAG_STRIP	0x01	/* Strip TMH. */
+
+#define PKT_TMH_DATA_LEN	(32 - (6 + 6 + 2 + 1))
+struct __attribute__((__packed__)) pkt_tmhdr {
+	u8 dmac[6];
+	u8 smac[6];
+	u16 etype;
+	u8 flags;	/* PKT_TMH_FLAG_nnn */
+	u8 data[PKT_TMH_DATA_LEN];
+};
+
 /* Reset statistics counters */
 struct reset_stat_cfg {
 	u8    msg;
@@ -610,6 +640,7 @@ union nic_mbx {
 	struct pfc		pfc;
 	struct set_ptp		ptp;
 	struct xcast            xcast;
+	struct port_context	ctx;
 };
 
 #define NIC_NODE_ID_MASK	0x03

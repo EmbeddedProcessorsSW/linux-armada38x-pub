@@ -271,6 +271,7 @@ struct snd_queue {
 	u32		tail;
 	u64		*skbuff;
 	void		*desc;
+	spinlock_t      lock; /* Lock to serialize access to TX queue.*/
 	u64		*xdp_page;
 	u16		xdp_desc_cnt;
 	u16		xdp_free_cnt;
