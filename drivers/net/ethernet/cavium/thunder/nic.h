@@ -426,6 +426,7 @@ struct nicvf {
 #define	NIC_MBOX_MSG_PFC		0x18	/* Pause frame control */
 #define	NIC_MBOX_MSG_PTP_CFG		0x19	/* HW packet timestamp */
 #define	NIC_MBOX_MSG_PORT_CTX		0x20	/* Change port oper.context */
+#define	NIC_MBOX_MSG_SET_LINK		0x21	/* Set link up and down */
 #define	NIC_MBOX_MSG_CFG_DONE		0xF0	/* VF configuration done */
 #define	NIC_MBOX_MSG_SHUTDOWN		0xF1	/* VF is being shutdown */
 #define	NIC_MBOX_MSG_RESET_XCAST	0xF2    /* Reset DCAM filtering mode */
@@ -548,6 +549,13 @@ struct set_loopback {
 	bool  enable;
 };
 
+/* Set link up/down */
+struct set_link_state {
+	u8    msg;
+	u8    vf_id;
+	bool  enable;
+};
+
 #define NIC_PORT_CTX_LINUX	0 /* Control plane/Linux */
 #define NIC_PORT_CTX_DATAPLANE	1 /* Data plane */
 
@@ -642,6 +650,7 @@ union nic_mbx {
 	struct set_ptp		ptp;
 	struct xcast            xcast;
 	struct port_context	ctx;
+	struct set_link_state	set_link;
 };
 
 #define NIC_NODE_ID_MASK	0x03

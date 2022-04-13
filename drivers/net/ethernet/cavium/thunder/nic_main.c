@@ -1018,6 +1018,21 @@ send_mbox:
 	nic_send_msg_to_vf(nic, pvf, &mbx);
 }
 
+static int nic_port_set_link_state(struct nicpf *nic,
+				   struct set_link_state *link)
+{
+	int bgx_idx, lmac_idx;
+
+	if (link->vf_id >= nic->num_vf_en)
+		return -1;
+
+	bgx_idx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[link->vf_id]);
+	lmac_idx = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[link->vf_id]);
+
+	return bgx_set_lmac_link_state(nic->node, bgx_idx, lmac_idx,
+				       link->enable);
+}
+
 static int nic_config_loopback(struct nicpf *nic, struct set_loopback *lbk)
 {
 	int bgx_idx, lmac_idx;
@@ -1367,6 +1382,9 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
 		return;
 	case NIC_MBOX_MSG_PTP_CFG:
 		nic_config_timestamp(nic, vf, &mbx.ptp);
+		break;
+	case NIC_MBOX_MSG_SET_LINK:
+		ret = nic_port_set_link_state(nic, &mbx.set_link);
 		break;
 	case NIC_MBOX_MSG_RESET_XCAST:
 		if (vf >= nic->num_vf_en) {
