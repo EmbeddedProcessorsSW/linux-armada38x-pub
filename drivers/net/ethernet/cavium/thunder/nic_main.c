@@ -64,8 +64,8 @@ struct nicpf {
 	u8			num_vec;
 	unsigned int		irq_allocated[NIC_PF_MSIX_VECTORS];
 	char			irq_name[NIC_PF_MSIX_VECTORS][20];
-	int			lbk_vf;
-	u8			lbk_link_status;
+	int			lbk_vf[NUM_LBK_IFS];
+	u8			lbk_link_status[NUM_LBK_IFS];
 };
 
 /* Supported devices */
@@ -181,7 +181,8 @@ EXPORT_SYMBOL(nic_bgx_port_ctx_set);
 
 #define LBK_PKIND 15
 
-static u8 lbk_link_up;
+static u8 lbk_link_up[NUM_LBK_IFS];
+static u8 bgx_lmac_cnt;
 
 static int nic_get_lbk_port_pkind(void)
 {
@@ -204,13 +205,13 @@ struct thunder_lbk_com_s thunder_lbk_com = {
 };
 EXPORT_SYMBOL(thunder_lbk_com);
 
-static void nic_lbk_link_update(struct nicpf *nic)
+static void nic_lbk_link_update(struct nicpf *nic, int vf_idx)
 {
 	union nic_mbx mbx = {};
-	u8 vf = nic->lbk_vf;
+	int vf = nic->lbk_vf[vf_idx - bgx_lmac_cnt];
 
 	mbx.link_status.msg = NIC_MBOX_MSG_BGX_LINK_CHANGE;
-	if (lbk_link_up) {
+	if (lbk_link_up[vf_idx - bgx_lmac_cnt]) {
 		mbx.link_status.link_up = true;
 		mbx.link_status.duplex = 1;
 		mbx.link_status.speed = 1000;
@@ -222,31 +223,43 @@ static void nic_lbk_link_update(struct nicpf *nic)
 		mbx.link_status.mac_type = LBK_MODE_LMAC;
 	}
 	nic_send_msg_to_vf(nic, vf, &mbx);
-	nic->lbk_link_status = lbk_link_up;
+	nic->lbk_link_status[vf - bgx_lmac_cnt] =
+		lbk_link_up[vf - bgx_lmac_cnt];
 }
 
 static void nic_create_lbk_interface(struct nicpf *nic)
 {
 	u64 lmac_credit;
 	u16 sdevid;
+	int i, num_lbk_ifs, numvfs;
 
 	pci_read_config_word(nic->pdev, PCI_SUBSYSTEM_ID, &sdevid);
 	if (sdevid != PCI_SUBSYS_DEVID_83XX_NIC_PF)
 		return;
-	nic->num_vf_en++; /* Additional vf for LBK */
 
-	nic->lbk_vf = nic->num_vf_en - 1;
-	lmac_credit = nic_reg_read(nic, NIC_PF_LMAC_0_7_CREDIT +
+	numvfs = pci_sriov_get_totalvfs(nic->pdev);
+
+	if (nic->num_vf_en + NUM_LBK_IFS <= numvfs)
+		num_lbk_ifs = NUM_LBK_IFS;
+	else
+		num_lbk_ifs = numvfs - nic->num_vf_en;
+
+	for (i = 0; i < num_lbk_ifs; i++) {
+		nic->num_vf_en++; /* Additional vf for LBK */
+
+		nic->lbk_vf[i] = nic->num_vf_en - 1;
+		lmac_credit = nic_reg_read(nic, NIC_PF_LMAC_0_7_CREDIT +
 			(NIC_LBK_PKIO_LMAC * 8));
 
-	lmac_credit = (1ull << 1); /* channel credit enable */
-	lmac_credit |= (0x1ff << 2); /* Max outstanding pkt count */
-	lmac_credit |= (((16 * 1024 - NIC_HW_MAX_FRS) / 16) << 12);
+		lmac_credit = (1ull << 1); /* channel credit enable */
+		lmac_credit |= (0x1ff << 2); /* Max outstanding pkt count */
+		lmac_credit |= (((16 * 1024 - NIC_HW_MAX_FRS) / 16) << 12);
 
-	nic_reg_write(nic, NIC_PF_LMAC_0_7_CREDIT +
+		nic_reg_write(nic, NIC_PF_LMAC_0_7_CREDIT +
 			(NIC_LBK_PKIO_LMAC * 8), lmac_credit);
-	/* LBK link is always up. */
-	lbk_link_up = 1;
+		/* LBK link is always up. */
+		lbk_link_up[i] = 1;
+	}
 }
 
 /* Responds to VF's READY message with VF's
@@ -263,7 +276,7 @@ static void nic_mbx_send_ready(struct nicpf *nic, int vf)
 	mbx.nic_cfg.vf_id = vf;
 
 	mbx.nic_cfg.tns_mode = NIC_TNS_BYPASS_MODE;
-	if (vf < nic->num_vf_en && vf != nic->lbk_vf) {
+	if (vf < nic->num_vf_en && vf < nic->lbk_vf[0]) {
 
 		bgx_idx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
 		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
@@ -272,7 +285,7 @@ static void nic_mbx_send_ready(struct nicpf *nic, int vf)
 			ether_addr_copy((u8 *)&mbx.nic_cfg.mac_addr, mac);
 	}
 	mbx.nic_cfg.sqs_mode = (vf >= nic->num_vf_en) ? true : false;
-	mbx.nic_cfg.lbk_mode = (vf == nic->lbk_vf) ? true : false;
+	mbx.nic_cfg.lbk_mode = (vf >= nic->lbk_vf[0]) ? true : false;
 	mbx.nic_cfg.node_id = nic->node;
 
 	mbx.nic_cfg.loopback_supported = vf < nic->num_vf_en;
@@ -438,6 +451,7 @@ static void nic_set_lmac_vf_mapping(struct nicpf *nic)
 			nic->vf_lmac_map[next_bgx_lmac++] =
 						NIC_SET_VF_LMAC_MAP(bgx, lmac);
 		nic->num_vf_en += lmac_cnt;
+		bgx_lmac_cnt = nic->num_vf_en;
 
 		/* Program LMAC credits */
 		lmac_credit = (1ull << 1); /* channel credit enable */
@@ -588,9 +602,9 @@ static void nic_config_cpi(struct nicpf *nic, struct cpi_cfg_msg *cfg)
 	u8  qset, rq_idx = 0;
 
 	vnic = cfg->vf_id;
-	if (vnic == nic->lbk_vf) {
+	if (vnic >= nic->lbk_vf[0]) {
 		lmac = NIC_LBK_PKIO_LMAC;
-		chan = NIC_LBK_CHAN_BASE + NIC_LBK_PKIO * hw->chans_per_lbk;
+		chan = NIC_LBK_CHAN_BASE + NIC_LBK_PKIO + (vnic - bgx_lmac_cnt);
 	} else {
 		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vnic]);
 		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vnic]);
@@ -747,9 +761,9 @@ static void nic_tx_channel_cfg(struct nicpf *nic, u8 vnic,
 	else
 		pqs_vnic = vnic;
 
-	if (vnic == nic->lbk_vf) {
+	if (vnic >= nic->lbk_vf[0]) {
 		lmac = NIC_LBK_PKIO_LMAC;
-		chan = NIC_LBK_CHAN_BASE + NIC_LBK_PKIO * hw->chans_per_lbk;
+		chan = NIC_LBK_CHAN_BASE + NIC_LBK_PKIO + (vnic - bgx_lmac_cnt);
 	} else {
 		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[pqs_vnic]);
 		lmac =
@@ -799,7 +813,8 @@ static void nic_tx_channel_cfg(struct nicpf *nic, u8 vnic,
 	if (hw->tl1_per_bgx)
 		nic_reg_write(nic, NIC_PF_TL3_0_255_CHAN | (tl3 << 3), chan);
 	else
-		nic_reg_write(nic, NIC_PF_TL3_0_255_CHAN | (tl3 << 3), 0);
+		nic_reg_write(nic, NIC_PF_TL3_0_255_CHAN | (tl3 << 3),
+			      (vnic - bgx_lmac_cnt));
 
 	/* Enable backpressure on the channel */
 	nic_reg_write(nic, NIC_PF_CHAN_0_255_TX_CFG | (chan << 3), 1);
@@ -1110,7 +1125,7 @@ static void nic_pause_frame(struct nicpf *nic, int vf, struct pfc *cfg)
 	struct pfc pfc;
 	union nic_mbx mbx = {};
 
-	if (vf >= nic->num_vf_en)
+	if (vf >= nic->lbk_vf[0])
 		return;
 	bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
 	lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
@@ -1135,7 +1150,7 @@ static void nic_config_timestamp(struct nicpf *nic, int vf, struct set_ptp *ptp)
 	u8 lmac, bgx_idx;
 	u64 pkind_val, pkind_idx;
 
-	if (vf >= nic->num_vf_en)
+	if (vf >= nic->lbk_vf[0])
 		return;
 
 	bgx_idx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
@@ -1176,9 +1191,10 @@ static void nic_link_status_get(struct nicpf *nic, u8 vf)
 	struct bgx_link_status link;
 	u8 bgx, lmac;
 
-	if (vf == nic->lbk_vf) {
-		if (lbk_link_up != nic->lbk_link_status)
-			nic_lbk_link_update(nic);
+	if (vf >= nic->lbk_vf[0]) {
+		if (lbk_link_up[vf - bgx_lmac_cnt] !=
+		    nic->lbk_link_status[vf - bgx_lmac_cnt])
+			nic_lbk_link_update(nic, vf);
 	}
 
 	mbx.link_status.msg = NIC_MBOX_MSG_BGX_LINK_CHANGE;
@@ -1281,7 +1297,7 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
 			ret = -1; /* NACK */
 			break;
 		}
-		if (vf == nic->lbk_vf) {
+		if (vf >= nic->lbk_vf[0]) {
 			ret = 0;
 			break;
 		}
@@ -1291,7 +1307,7 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
 		bgx_set_lmac_mac(nic->node, bgx, lmac, mbx.mac.mac_addr);
 		break;
 	case NIC_MBOX_MSG_SET_MAX_FRS:
-		if (vf == nic->lbk_vf)
+		if (vf >= nic->lbk_vf[0])
 			break;
 		ret = nic_update_hw_frs(nic, mbx.frs.max_frs,
 					mbx.frs.vf_id);
@@ -1308,7 +1324,7 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
 		break;
 	case NIC_MBOX_MSG_CFG_DONE:
 		/* Last message of VF config msg sequence */
-		if (vf == nic->lbk_vf)
+		if (vf >= nic->lbk_vf[0])
 			nic->vf_enabled[vf] = true;
 		else
 			nic_enable_vf(nic, vf, true);
@@ -1320,7 +1336,7 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
 				nic->vf_sqs[vf][i] = NIC_VF_UNASSIGNED;
 		}
 		nic->pqs_vf[vf] = NIC_VF_UNASSIGNED;
-		if (vf == nic->lbk_vf)
+		if (vf >= nic->lbk_vf[0])
 			nic->vf_enabled[vf] = false;
 		else
 			nic_enable_vf(nic, vf, false);
@@ -1605,7 +1621,10 @@ static int nic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 
 	nic->node = nic_get_node_id(pdev);
-	nic->lbk_vf = -1; /* Default No lbk interface assigned*/
+	nic->lbk_vf[0] = -1; /* Default No lbk interface assigned*/
+	nic->lbk_vf[1] = -1; /* Default No lbk interface assigned*/
+	nic->lbk_vf[2] = -1; /* Default No lbk interface assigned*/
+	nic->lbk_vf[3] = -1; /* Default No lbk interface assigned*/
 
 	/* Get HW capability info */
 	nic_get_hw_info(nic);
