@@ -561,6 +561,7 @@ struct set_link_state {
 
 #define LBK_IF_IDX	0xff /* LBK virtual port index */
 #define NUM_LBK_IFS 4    /* Number of LBK netdevices in kernel */
+#define INVALID_VF 0xFF
 
 struct port_context {
 	u8    msg;
