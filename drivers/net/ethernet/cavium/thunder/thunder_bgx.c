@@ -62,6 +62,21 @@ struct lmac {
 	bool			is_sgmii;
 	struct delayed_work	dwork;
 	struct workqueue_struct *check_link;
+
+	struct {
+		struct work_struct	work;
+		struct workqueue_struct *wq;
+		bool			enable; /* param for bottom half */
+	} sls_bh; /* for set_link_state bottom half */
+
+	struct {
+		bool	is_pending;
+		u8	lmac_type;
+		bool	use_training;
+		bool	autoneg;
+		bool	is_sgmii;
+		bool	is_1000base_x;
+	} cm; /* for change mode */
 };
 
 struct bgx {
@@ -82,6 +97,7 @@ static int lmac_count; /* Total no of LMACs in system */
 
 static int bgx_xaui_check_link(struct lmac *lmac);
 static int bgx_lmac_sgmii_init(struct bgx *bgx, struct lmac *lmac);
+static void bgx_poll_for_link(struct work_struct *work);
 
 static int (*bgx_port_ctx_set)(int node, int bgx, int lmac, int ctx,
 			       int dp_idx);
@@ -308,6 +324,7 @@ struct thunder_bgx_com_s thunder_bgx_com = {
 	.disable = bgx_disable_rx_tx,
 	.init_ctx_set_cb = bgx_init_ctx_set_cb,
 	.switch_ctx = bgx_switch_ctx,
+	.change_mode = bgx_change_lmac_mode,
 };
 EXPORT_SYMBOL(thunder_bgx_com);
 
@@ -749,6 +766,22 @@ static int bgx_lmac_sgmii_init(struct bgx *bgx, struct lmac *lmac)
 	int lmacid = lmac->lmacid;
 	u64 cfg;
 
+	if (lmac->cm.is_pending && lmac->cm.lmac_type == BGX_MODE_SGMII) {
+		cfg = bgx_reg_read(bgx, lmacid, BGX_GMP_PCS_MISCX_CTL);
+		if (lmac->cm.is_1000base_x)
+			cfg |= PCS_MISC_CTL_MODE;
+		else
+			cfg &= ~PCS_MISC_CTL_MODE;
+		bgx_reg_write(bgx, lmacid, BGX_GMP_PCS_MISCX_CTL, cfg);
+
+		cfg = bgx_reg_read(bgx, lmacid, BGX_GMP_PCS_MRX_CTL);
+		if (lmac->cm.autoneg)
+			cfg |= PCS_MRX_CTL_AN_EN;
+		else
+			cfg &= ~PCS_MRX_CTL_AN_EN;
+		bgx_reg_write(bgx, lmacid, BGX_GMP_PCS_MRX_CTL, cfg);
+	}
+
 	bgx_reg_modify(bgx, lmacid, BGX_GMP_GMI_TXX_THRESH, 0x30);
 	/* max packet size */
 	bgx_reg_modify(bgx, lmacid, BGX_GMP_GMI_RXX_JABBER, MAX_FRAME_SIZE);
@@ -922,7 +955,7 @@ static int bgx_lmac_link_bring_up(struct bgx *bgx, struct lmac *lmac)
 			goto out;
 		}
 		/* Manually changing up the link state as there is no poll
-		 * function to do the job, unlike xaui/xlaui.
+		 * function running to do the job.
 		 */
 		lmac->link_up = true;
 		lmac->last_speed = 1000;
@@ -936,6 +969,16 @@ static int bgx_lmac_link_bring_up(struct bgx *bgx, struct lmac *lmac)
 				bgx->bgx_id, lmacid);
 			goto out;
 		}
+		/* Manually changing up the link state as there is no poll
+		 * function running to do the job.
+		 */
+		lmac->link_up = true;
+		lmac->last_duplex = 1;
+		lmac->last_link = lmac->link_up;
+		if (lmac->lmac_type == BGX_MODE_XLAUI)
+			lmac->last_speed = 40000;
+		else
+			lmac->last_speed = 10000;
 	}
 
 	cfg = bgx_reg_read(bgx, lmacid, BGX_CMRX_CFG);
@@ -985,24 +1028,72 @@ static int bgx_lmac_link_bring_down(struct bgx *bgx, struct lmac *lmac)
 	bgx_lmac_link_down(bgx, lmac);
 
 	/* Manually changing up the link state as there is no poll
-	 * function to do the job, unlike xaui/xlaui.
+	 * function running to do the job.
 	 */
+	lmac->link_up = false;
+	lmac->last_link = lmac->link_up;
+	lmac->last_speed = SPEED_UNKNOWN;
+	lmac->last_duplex = DUPLEX_UNKNOWN;
+
 	if (lmac->is_sgmii) {
-		lmac->link_up = false;
-		lmac->last_link = lmac->link_up;
-		lmac->last_speed = SPEED_UNKNOWN;
-		lmac->last_duplex = DUPLEX_UNKNOWN;
 		bgx_sgmii_change_link_state(lmac);
 	}
 
 	return 0;
 }
 
+static void bgx_set_lmac_link_state_bh(struct work_struct *work)
+{
+	u64 lmac_is_enabled;
+	struct lmac *lmac;
+	struct bgx *bgx;
+	bool enable;
+
+	lmac = container_of(work, struct lmac, sls_bh.work);
+	bgx = lmac->bgx;
+	enable = lmac->sls_bh.enable;
+
+	lmac_is_enabled = bgx_reg_read(lmac->bgx, lmac->lmacid, BGX_CMRX_CFG)
+			  & CMR_EN;
+
+	if (enable) {
+		if (!lmac_is_enabled) {
+			if (lmac->cm.is_pending) {
+				lmac->lmac_type = lmac->cm.lmac_type;
+				lmac->use_training = lmac->cm.use_training;
+				lmac->autoneg = lmac->cm.autoneg;
+				lmac->is_sgmii = lmac->cm.is_sgmii;
+			}
+
+			bgx_lmac_link_bring_up(bgx, lmac);
+
+			if (lmac->cm.is_pending) {
+				if (!lmac->is_sgmii)
+					queue_delayed_work(lmac->check_link,
+							   &lmac->dwork, 0);
+				lmac->cm.is_pending = false;
+			}
+		} else {
+			/* No operation to perform */
+			dev_info(&bgx->pdev->dev, "BGX %d LMAC %d is already UP\n",
+				 bgx->bgx_id, lmac->lmacid);
+		}
+	} else {
+		if (lmac_is_enabled) {
+			bgx_lmac_link_bring_down(bgx, lmac);
+			cancel_delayed_work_sync(&lmac->dwork);
+		} else {
+			/* No operation to perform */
+			dev_info(&bgx->pdev->dev, "BGX %d LMAC %d is already DOWN\n",
+				 bgx->bgx_id, lmac->lmacid);
+		}
+	}
+}
+
 int bgx_set_lmac_link_state(int node, int bgx_idx, int lmacid, bool enable)
 {
 	struct lmac *lmac;
 	struct bgx *bgx;
-	int res = 0;
 
 	bgx = get_bgx(node, bgx_idx);
 	if (!bgx)
@@ -1010,34 +1101,66 @@ int bgx_set_lmac_link_state(int node, int bgx_idx, int lmacid, bool enable)
 
 	lmac = &bgx->lmac[lmacid];
 
-	/* If any local or remote fault exists, state cannot be changed */
-	if (!!(bgx_reg_read(lmac->bgx, lmac->lmacid, BGX_SMUX_RX_CTL) &
-	    SMU_RX_CTL_STATUS)) {
-		dev_err(&bgx->pdev->dev, "BGX %d LMAC %d has a fault link state\n",
-			bgx_idx, lmacid);
+	/* We're probably in interrupt context, but setting lmac link state
+	 * involves sleeps, so we need a bottom half in process context.
+	 */
+	lmac->sls_bh.enable = enable;
+	queue_work(lmac->sls_bh.wq, &lmac->sls_bh.work);
+
+	return 0;
+}
+EXPORT_SYMBOL(bgx_set_lmac_link_state);
+
+int bgx_change_lmac_mode(int node, int bgx_idx, int lmacid, void *param)
+{
+	struct change_mode *cm = param;
+	struct lmac *lmac;
+	struct bgx *bgx;
+
+	bgx = get_bgx(node, bgx_idx);
+	if (!bgx)
+		return -1;
+
+	lmac = &bgx->lmac[lmacid];
+
+	switch (cm->qlm_mode) {
+	case QLM_MODE_1G_X:
+		lmac->cm.lmac_type = BGX_MODE_SGMII;
+		lmac->cm.is_1000base_x = true;
+		lmac->cm.use_training = false;
+		lmac->cm.autoneg = cm->autoneg;
+		lmac->cm.is_sgmii = true;
+		lmac->cm.is_pending = true;
+		break;
+
+	case QLM_MODE_SGMII:
+		lmac->cm.lmac_type = BGX_MODE_SGMII;
+		lmac->cm.is_1000base_x = false;
+		lmac->cm.use_training = false;
+		lmac->cm.autoneg = cm->autoneg;
+		lmac->cm.is_sgmii = true;
+		lmac->cm.is_pending = true;
+		break;
+
+	case QLM_MODE_XFI:
+		lmac->cm.lmac_type = BGX_MODE_XFI;
+		lmac->cm.use_training = false;
+		lmac->cm.autoneg = false;
+		lmac->cm.is_sgmii = false;
+		lmac->cm.is_1000base_x = false;
+		lmac->cm.is_pending = true;
+		break;
+
+	default:
+		dev_err(&bgx->pdev->dev,
+			"Changing to QLM mode %d is not supported.\n",
+			cm->qlm_mode);
 		return -1;
 	}
 
-	if (enable) {
-		/* If last link state was down */
-		if (!lmac->last_link)
-			res = bgx_lmac_link_bring_up(bgx, lmac);
-		else /* No operation to perform */
-			dev_info(&bgx->pdev->dev, "BGX %d LMAC %d is already UP\n",
-				 bgx_idx, lmacid);
-	} else {
-		/* If last link state was up */
-		if (lmac->last_link)
-			res = bgx_lmac_link_bring_down(bgx, lmac);
-		else /* No operation to perform */
-			dev_info(&bgx->pdev->dev, "BGX %d LMAC %d is already DOWN\n",
-				 bgx_idx, lmacid);
-	}
-
-	/* Returning zero even if no operation performed */
-	return res;
+	return 0;
 }
-EXPORT_SYMBOL(bgx_set_lmac_link_state);
+EXPORT_SYMBOL(bgx_change_lmac_mode);
 
 static int bgx_xaui_check_link(struct lmac *lmac)
 {
@@ -1308,6 +1431,22 @@ static int bgx_lmac_enable(struct bgx *bgx, u8 lmacid)
 	/* Restore default cfg, incase low level firmware changed it */
 	bgx_reg_write(bgx, lmacid, BGX_CMRX_RX_DMAC_CTL, 0x03);
 
+	/* Init check link work queue, but don't queue any work item yet */
+	lmac->check_link = alloc_workqueue("check_link%d.%d", WQ_UNBOUND |
+					   WQ_MEM_RECLAIM, 1,
+					   bgx->bgx_id, lmac->lmacid);
+	if (!lmac->check_link)
+		return -ENOMEM;
+	INIT_DELAYED_WORK(&lmac->dwork, bgx_poll_for_link);
+
+	/* Init work queue for bottom half of set_link_state */
+	lmac->sls_bh.wq = alloc_workqueue("set_link_state_bh%d.%d", WQ_UNBOUND |
+					  WQ_MEM_RECLAIM, 1,
+					  bgx->bgx_id, lmac->lmacid);
+	if (!lmac->sls_bh.wq)
+		return -ENOMEM;
+	INIT_WORK(&lmac->sls_bh.work, bgx_set_lmac_link_state_bh);
+
 	if (lmac->is_sgmii) {
 		if (!lmac->phydev) {
 			if (lmac->autoneg) {
@@ -1336,11 +1475,6 @@ static int bgx_lmac_enable(struct bgx *bgx, u8 lmacid)
 	}
 
 poll:
-	lmac->check_link = alloc_workqueue("check_link", WQ_UNBOUND |
-					   WQ_MEM_RECLAIM, 1);
-	if (!lmac->check_link)
-		return -ENOMEM;
-	INIT_DELAYED_WORK(&lmac->dwork, bgx_poll_for_link);
 	queue_delayed_work(lmac->check_link, &lmac->dwork, 0);
 
 	return 0;

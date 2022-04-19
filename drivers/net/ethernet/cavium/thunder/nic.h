@@ -427,6 +427,7 @@ struct nicvf {
 #define	NIC_MBOX_MSG_PTP_CFG		0x19	/* HW packet timestamp */
 #define	NIC_MBOX_MSG_PORT_CTX		0x20	/* Change port oper.context */
 #define	NIC_MBOX_MSG_SET_LINK		0x21	/* Set link up and down */
+#define NIC_MBOX_MSG_CHANGE_MODE	0x22	/* Change Ethernet mode */
 #define	NIC_MBOX_MSG_CFG_DONE		0xF0	/* VF configuration done */
 #define	NIC_MBOX_MSG_SHUTDOWN		0xF1	/* VF is being shutdown */
 #define	NIC_MBOX_MSG_RESET_XCAST	0xF2    /* Reset DCAM filtering mode */
@@ -556,6 +557,16 @@ struct set_link_state {
 	bool  enable;
 };
 
+/* Change Ethernet mode */
+struct change_mode {
+	u8    msg;
+	u8    vf_id;
+	u8    qlm_mode;
+	bool  autoneg;
+	u8    duplex;
+	u32   speed;
+};
+
 #define NIC_PORT_CTX_LINUX	0 /* Control plane/Linux */
 #define NIC_PORT_CTX_DATAPLANE	1 /* Data plane */
 
@@ -652,6 +663,7 @@ union nic_mbx {
 	struct xcast            xcast;
 	struct port_context	ctx;
 	struct set_link_state	set_link;
+	struct change_mode	cm;
 };
 
 #define NIC_NODE_ID_MASK	0x03

@@ -230,6 +230,7 @@ unsigned bgx_get_map(int node);
 int bgx_get_lmac_count(int node, int bgx);
 const u8 *bgx_get_lmac_mac(int node, int bgx_idx, int lmacid);
 void bgx_set_lmac_mac(int node, int bgx_idx, int lmacid, const u8 *mac);
+int bgx_change_lmac_mode(int node, int bgx_idx, int lmacid, void *param);
 void bgx_get_lmac_link_state(int node, int bgx_idx, int lmacid, void *status);
 int bgx_set_lmac_link_state(int node, int bgx_idx, int lmacid, bool enable);
 void bgx_init_ctx_set_cb(const void *cb);
@@ -264,6 +265,8 @@ struct thunder_bgx_com_s {
 	void (*init_ctx_set_cb)(const void *cb);
 	void (*switch_ctx)(int node, int bgx_idx, int lmac_idx,
 			   int ctx, int dp_idx);
+	int (*change_mode)(int node, int bgx_idx, int lmac_idx,
+			   void *cfg);
 };
 
 extern struct thunder_bgx_com_s thunder_bgx_com;
@@ -287,5 +290,10 @@ enum LMAC_TYPE {
 	BGX_MODE_INVALID = 7,
 	LBK_MODE_LMAC = 8,
 };
+
+/* values came from BDK */
+#define QLM_MODE_SGMII  7
+#define QLM_MODE_1G_X   8
+#define QLM_MODE_XFI   12
 
 #endif /* THUNDER_BGX_H */

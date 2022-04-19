@@ -1049,6 +1049,19 @@ static int nic_port_set_link_state(struct nicpf *nic,
 				       link->enable);
 }
 
+static int nic_port_change_mode(struct nicpf *nic, struct change_mode *cm)
+{
+	int bgx_idx, lmac_idx;
+
+	if (cm->vf_id >= nic->num_vf_en)
+		return -1;
+
+	bgx_idx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[cm->vf_id]);
+	lmac_idx = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[cm->vf_id]);
+
+	return bgx_change_lmac_mode(nic->node, bgx_idx, lmac_idx, cm);
+}
+
 static int nic_config_loopback(struct nicpf *nic, struct set_loopback *lbk)
 {
 	int bgx_idx, lmac_idx;
@@ -1401,6 +1414,9 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
 		break;
 	case NIC_MBOX_MSG_SET_LINK:
 		ret = nic_port_set_link_state(nic, &mbx.set_link);
+		break;
+	case NIC_MBOX_MSG_CHANGE_MODE:
+		ret = nic_port_change_mode(nic, &mbx.cm);
 		break;
 	case NIC_MBOX_MSG_RESET_XCAST:
 		if (vf >= nic->num_vf_en) {
