@@ -15,6 +15,7 @@
 
 #include "../thunder/thunder_bgx.h"
 #include "../thunder/nic.h"
+#include "pki.h"
 #include "bgx.h"
 
 #define NIC_PORT_CTX_LINUX      0 /* Control plane/Linux */
@@ -919,6 +920,8 @@ int bgx_port_stats_get(struct octtx_bgx_port *port,
 		       mbox_bgx_port_stats_t *stats)
 {
 	struct bgxpf *bgx;
+	struct pki_com_s *pki;
+	int ret;
 	u64 reg;
 
 	bgx = get_bgx_dev(port->node, port->bgx);
@@ -929,6 +932,8 @@ int bgx_port_stats_get(struct octtx_bgx_port *port,
 	stats->rx_packets = reg;
 	reg = bgx_reg_read(bgx, port->lmac, BGX_CMRX_RX_STAT1);
 	stats->rx_bytes = reg;
+	reg = bgx_reg_read(bgx, port->lmac, BGX_CMRX_RX_STAT2);
+	stats->rx_pause_packets = reg;
 	reg = bgx_reg_read(bgx, port->lmac, BGX_CMRX_RX_STAT4);
 	stats->rx_dropped = reg;
 	reg = bgx_reg_read(bgx, port->lmac, BGX_CMRX_RX_STAT6);
@@ -969,6 +974,17 @@ int bgx_port_stats_get(struct octtx_bgx_port *port,
 	stats->tx_broadcast_packets = reg;
 	reg = bgx_reg_read(bgx, port->lmac, BGX_CMRX_TX_STAT15);
 	stats->tx_multicast_packets = reg;
+	reg = bgx_reg_read(bgx, port->lmac, BGX_CMRX_TX_STAT17);
+	stats->tx_pause_packets = reg;
+
+	pki = try_then_request_module(symbol_get(pki_com), "pki");
+	if (pki) {
+		ret = pki->get_bgx_port_stats(port);
+		if (!ret)
+			stats->rx_dropped += port->stats.rxdrop;
+		symbol_put(pki_com);
+	}
+
 	return 0;
 }
 

@@ -637,6 +637,8 @@ int pki_get_bgx_port_stats(struct octtx_bgx_port *port)
 	port->stats.rxbcast = reg & ((1ull << 47) - 1);
 	reg = pki_reg_read(pki, PKI_STATX_STAT6(port->pkind));
 	port->stats.rxmcast = reg & ((1ull << 47) - 1);
+	reg = pki_reg_read(pki, PKI_STATX_STAT3(port->pkind));
+	port->stats.rxdrop = reg & ((1ull << 47) - 1);
 	return 0;
 }
 

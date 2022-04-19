@@ -405,6 +405,9 @@ typedef struct mbox_bgx_port_stats {
 	u64 rx_oversize_errors;
 	u64 rx_fragmented_errors;
 	u64 rx_jabber_errors;
+
+	u64 rx_pause_packets;
+	u64 tx_pause_packets;
 } mbox_bgx_port_stats_t;
 
 /* BGX port fifo config: */
