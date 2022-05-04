@@ -23,3 +23,4 @@ obj-$(CONFIG_MARVELL_ODYSSEY_TAD_PMU) += marvell_odyssey_tad_pmu.o
 obj-$(CONFIG_MARVELL_PEM_PMU) += marvell_pem_pmu.o
 obj-$(CONFIG_APPLE_M1_CPU_PMU) += apple_m1_cpu_pmu.o
 obj-$(CONFIG_ALIBABA_UNCORE_DRW_PMU) += alibaba_uncore_drw_pmu.o
+obj-$(CONFIG_RESCTRL_PMU) += resctrl_pmu.o

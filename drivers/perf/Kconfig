@@ -213,4 +213,11 @@ config MARVELL_CN10K_DDR_PMU
 	  Enable perf support for Marvell DDR Performance monitoring
 	  event on CN10K platform.
 
+config RESCTRL_PMU
+	bool "Make resctrl counters accessible via perf"
+	depends on RESCTRL_FS
+	help
+	  Enable perf support for reading resctrl counters via perf. These
+	  counters are provided on hardware with Intel RDT, AMD QoS or ARM MPAM.
+
 endmenu

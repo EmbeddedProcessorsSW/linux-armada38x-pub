@@ -69,4 +69,6 @@ enum resctrl_event_id {
 	QOS_L3_MBM_LOCAL_EVENT_ID	= 0x03,
 };
 
+#define RESCTRL_MAX_EVENT_NUM		3
+
 #endif /* __LINUX_RESCTRL_TYPES_H */
