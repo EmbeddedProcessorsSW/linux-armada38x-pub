@@ -229,14 +229,23 @@ int resctrl_arch_rmid_read(struct rdt_resource *r, struct rdt_domain *d,
 			   u64 *val, int ignored)
 {
 	struct __rmid_read_arg arg;
-	int err;
+	int err = -EIO;
 
 	arg.rmid = rmid;
 	arg.eventid = eventid;
 	arg.hw_res = resctrl_to_arch_res(r);
 	arg.hw_dom = resctrl_to_arch_dom(d);
 
-	err = smp_call_function_any(&d->cpu_mask, rmid_read, &arg, true);
+	/*
+	 * Calls from resctrl occur in process context with IRQs unmasked,
+	 * resctrl_pmu calls on the correct CPU, but may have IRQs masked.
+	 */
+	if (!irqs_disabled()) { 
+		err = smp_call_function_any(&d->cpu_mask, rmid_read, &arg, true);
+	} else if (cpumask_test_cpu(smp_processor_id(), &d->cpu_mask)) {
+		rmid_read(&arg);
+		err = 0;
+	}
 	if (err)
 		return err;
 	if (arg.err)
