@@ -51,6 +51,8 @@ static bool resctrl_enabled;
 static bool cacheinfo_ready;
 static DECLARE_WAIT_QUEUE_HEAD(wait_cacheinfo_ready);
 
+bool mpam_monitors_free_runing;
+
 bool resctrl_arch_alloc_capable(void)
 {
 	return exposed_alloc_capable;
@@ -292,7 +294,11 @@ int resctrl_arch_mon_ctx_alloc_no_wait(struct rdt_resource *r, int evtid)
 
 		return mpam_alloc_csu_mon(res->class);
 	case QOS_L3_MBM_LOCAL_EVENT_ID:
-		return USE_RMID_IDX;
+		if (mpam_monitors_free_runing)
+			return USE_RMID_IDX;
+		res = container_of(r, struct mpam_resctrl_res, resctrl_res);
+
+		return mpam_alloc_mbwu_mon(res->class);
 	case QOS_L3_MBM_TOTAL_EVENT_ID:
 	default:
 		return -EOPNOTSUPP;
@@ -310,8 +316,16 @@ void resctrl_arch_mon_ctx_free(struct rdt_resource *r, int evtid, int ctx)
 		mpam_free_csu_mon(res->class, ctx);
 		wake_up(&resctrl_mon_ctx_waiters);
 		return;
-	case QOS_L3_MBM_TOTAL_EVENT_ID:
 	case QOS_L3_MBM_LOCAL_EVENT_ID:
+		if (mpam_monitors_free_runing)
+			return;
+		res = container_of(r, struct mpam_resctrl_res, resctrl_res);
+
+		mpam_free_mbwu_mon(res->class, ctx);
+		wake_up(&resctrl_mon_ctx_waiters);
+		return;
+	case QOS_L3_MBM_TOTAL_EVENT_ID:
+	default:
 		return;
 	}
 }
@@ -455,15 +469,21 @@ static bool class_has_usable_mbwu(struct mpam_class *class)
 	if (!mpam_has_feature(mpam_feat_msmon_mbwu, cprops))
 		return false;
 
-	/*
-	 * resctrl expects the bandwidth counters to be free running,
-	 * which means we need as many monitors as resctrl has
-	 * control/monitor groups.
-	 */
-	if (cprops->num_mbwu_mon < resctrl_arch_system_num_rmid_idx())
+	if ((mpam_partid_max <= 1) && (mpam_pmg_max == 0))
 		return false;
 
-	return (mpam_partid_max > 1) || (mpam_pmg_max != 0);
+	/*
+	 * resctrl expects the bandwidth counters to be free running,
+	 * which means to expose the files in the filesystem we need
+	 * as many monitors as resctrl has control/monitor groups.
+	 * Otherwise, these counters are only accessible via perf.
+	 */
+	if (cprops->num_mbwu_mon < resctrl_arch_system_num_rmid_idx())
+		mpam_monitors_free_runing = false;
+	else
+		mpam_monitors_free_runing = true;
+
+	return true;
 }
 
 static bool mba_class_use_mbw_part(struct mpam_props *cprops)
