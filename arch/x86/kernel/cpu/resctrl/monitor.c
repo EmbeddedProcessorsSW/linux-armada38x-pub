@@ -148,13 +148,15 @@ void resctrl_arch_reset_rmid(struct rdt_resource *r, struct rdt_domain *d,
 {
 	struct rdt_hw_domain *hw_dom = resctrl_to_arch_dom(d);
 	struct arch_mbm_state *am;
+	u64 msr_val;
 
 	am = get_arch_mbm_state(hw_dom, rmid, eventid);
 	if (am) {
 		memset(am, 0, sizeof(*am));
 
 		/* Record any initial, non-zero count value. */
-		__rmid_read(rmid, eventid, &am->prev_msr);
+		__rmid_read(rmid, eventid, &msr_val);
+		atomic64_set(&am->prev_msr, msr_val);
 	}
 }
 
@@ -177,31 +179,49 @@ struct __rmid_read_arg
 	int err;
 };
 
-static void rmid_read(void *_arg)
+static int _rmid_read(void *_arg)
 {
 	struct __rmid_read_arg *arg = _arg;
 	enum resctrl_event_id eventid;
+	u64 prev_msr, msr_val, chunks;
 	struct arch_mbm_state *am;
 	u32 rmid = arg->rmid;
-	u64 msr_val, chunks;
 
 	eventid = arg->eventid;
 
+	am = get_arch_mbm_state(arg->hw_dom, rmid, eventid);
+	if (am)
+		prev_msr = atomic64_read(&am->prev_msr);
+
 	arg->err = __rmid_read(rmid, eventid, &msr_val);
 	if (arg->err)
-		return;
+		return arg->err;
 
-	am = get_arch_mbm_state(arg->hw_dom, rmid, eventid);
 	if (am) {
-		am->chunks += mbm_overflow_count(am->prev_msr, msr_val,
-						 arg->hw_res->mbm_width);
-		chunks = get_corrected_mbm_count(rmid, am->chunks);
-		am->prev_msr = msr_val;
+		chunks = mbm_overflow_count(prev_msr, msr_val,
+					    arg->hw_res->mbm_width);
+
+		if (atomic64_cmpxchg(&am->prev_msr, prev_msr, msr_val) != prev_msr)
+			return -EINTR;
+
+		chunks = atomic64_add_return(chunks, &am->chunks);
+		chunks = get_corrected_mbm_count(rmid, chunks);
 	} else {
 		chunks = msr_val;
 	}
 
 	arg->val = chunks * arg->hw_res->mon_scale;
+
+	return 0;
+}
+
+static void rmid_read(void *_arg)
+{
+	struct __rmid_read_arg *arg = _arg;
+
+	do {
+		arg->err = _rmid_read(arg);
+	} while (arg->err && arg->err != -EINTR);
 }
 
 int resctrl_arch_rmid_read(struct rdt_resource *r, struct rdt_domain *d,
@@ -215,7 +235,6 @@ int resctrl_arch_rmid_read(struct rdt_resource *r, struct rdt_domain *d,
 	arg.eventid = eventid;
 	arg.hw_res = resctrl_to_arch_res(r);
 	arg.hw_dom = resctrl_to_arch_dom(d);
-	arg.err = 0;
 
 	err = smp_call_function_any(&d->cpu_mask, rmid_read, &arg, true);
 	if (err)
