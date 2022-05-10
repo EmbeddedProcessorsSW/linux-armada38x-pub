@@ -65,6 +65,12 @@ unsigned int resctrl_rmid_realloc_threshold;
  */
 unsigned int resctrl_rmid_realloc_limit;
 
+
+/*
+ * Wait-queue for tasks waiting for a monitoring context to become available.
+ */
+DECLARE_WAIT_QUEUE_HEAD(resctrl_mon_ctx_waiters);
+
 /*
  * x86 and arm64 differ in their handling of monitoring.
  * x86's RMID are an independent number, there is only one source of traffic
@@ -757,4 +763,23 @@ int resctrl_mon_resource_init(void)
 		l3_mon_evt_init(r);
 
 	return 0;
+}
+
+int __weak resctrl_arch_mon_ctx_alloc(struct rdt_resource *r, int evtid)
+{
+	DEFINE_WAIT(wait);
+	int ret;
+
+	might_sleep();
+
+	do {
+		prepare_to_wait(&resctrl_mon_ctx_waiters, &wait,
+				TASK_UNINTERRUPTIBLE);
+		ret = resctrl_arch_mon_ctx_alloc_no_wait(r, evtid);
+		if (ret == -ENOSPC)
+			schedule();
+	} while (ret == -ENOSPC);
+	finish_wait(&resctrl_mon_ctx_waiters, &wait);
+
+	return ret;
 }
