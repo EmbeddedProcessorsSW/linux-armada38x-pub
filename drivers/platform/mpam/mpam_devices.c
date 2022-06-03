@@ -2394,10 +2394,8 @@ static int __init mpam_msc_driver_init(void)
 	else
 		fw_num_msc = mpam_dt_count_msc();
 
-	if (fw_num_msc <= 0) {
-		pr_err("No MSC devices found in firmware\n");
+	if (fw_num_msc <= 0)
 		return -EINVAL;
-	}
 
 	if (acpi_disabled)
 		mpam_dt_create_foundling_msc();
