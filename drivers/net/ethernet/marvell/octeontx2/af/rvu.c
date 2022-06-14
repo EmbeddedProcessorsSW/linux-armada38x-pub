@@ -11,6 +11,7 @@
 #include <linux/irq.h>
 #include <linux/pci.h>
 #include <linux/sysfs.h>
+#include <linux/jiffies.h>
 
 #include "cgx.h"
 #include "rvu.h"
@@ -2768,6 +2769,7 @@ static void rvu_npa_lf_mapped_sso_lf_teardown(struct rvu *rvu, u16 pcifunc)
 	u16 sso_pcifunc, match_cnt = 0;
 	struct rvu_block *sso_block;
 	struct rsrc_detach detach;
+	unsigned long drain_tmo;
 	u16 *pcifunc_arr;
 	u64 regval;
 
@@ -2786,8 +2788,14 @@ static void rvu_npa_lf_mapped_sso_lf_teardown(struct rvu *rvu, u16 pcifunc)
 
 	sso_block = &rvu->hw->block[blkaddr];
 	retry = 0;
+	drain_tmo = jiffies + msecs_to_jiffies(SSO_FLUSH_TMO_MAX);
 	for (lf = 0; lf < sso_block->lf.max || retry; lf++) {
 		if (lf == sso_block->lf.max) {
+			if (time_after(jiffies, drain_tmo)) {
+				dev_err(rvu->dev, "Failed to drain SSO queues\n");
+				break;
+			}
+
 			lf = 0;
 			retry = 0;
 		}
@@ -2851,6 +2859,7 @@ static void rvu_npa_lf_mapped_sso_lf_teardown(struct rvu *rvu, u16 pcifunc)
 static void rvu_blklf_teardown(struct rvu *rvu, u16 pcifunc, u8 blkaddr)
 {
 	struct rvu_block *block;
+	unsigned long drain_tmo;
 	int slot, lf, num_lfs;
 	int err, retry;
 
@@ -2862,8 +2871,15 @@ static void rvu_blklf_teardown(struct rvu *rvu, u16 pcifunc, u8 blkaddr)
 
 	if (block->addr == BLKADDR_SSO) {
 		retry = 0;
+		drain_tmo = jiffies + msecs_to_jiffies(SSO_FLUSH_TMO_MAX);
 		for (slot = 0; slot < num_lfs || retry; slot++) {
 			if (slot == num_lfs) {
+				if (time_after(jiffies, drain_tmo)) {
+					dev_err(rvu->dev,
+						"Failed to drain SSO queues\n");
+					break;
+				}
+
 				slot = 0;
 				retry = 0;
 			}
