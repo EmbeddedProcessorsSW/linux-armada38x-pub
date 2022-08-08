@@ -373,15 +373,19 @@ static void otx2_rcv_pkt_handler(struct otx2_nic *pfvf,
 	struct nix_rx_parse_s *parse = &cqe->parse;
 	struct nix_rx_sg_s *sg = &cqe->sg;
 	struct sk_buff *skb = NULL;
+	u64 *word = (u64 *)parse;
 	void *end, *start;
 	u64 *seg_addr;
 	u16 *seg_size;
 	int seg;
 
 	if (unlikely(parse->errlev || parse->errcode)) {
-		if (otx2_check_rcv_errors(pfvf, cqe, cq->cq_idx))
+		if (otx2_check_rcv_errors(pfvf, cqe, cq->cq_idx)) {
+			trace_otx2_parse_dump(pfvf->pdev, "Err:", word);
 			return;
+		}
 	}
+	trace_otx2_parse_dump(pfvf->pdev, "", word);
 
 	if (pfvf->xdp_prog)
 		if (otx2_xdp_rcv_pkt_handler(pfvf, pfvf->xdp_prog, cqe, cq, need_xdp_flush))
@@ -438,6 +442,7 @@ static int otx2_rx_napi_handler(struct otx2_nic *pfvf,
 process_cqe:
 	while (likely(processed_cqe < budget) && cq->pend_cqe) {
 		cqe = (struct nix_cqe_rx_s *)CQE_ADDR(cq, cq->cq_head);
+
 		if (cqe->hdr.cqe_type == NIX_XQE_TYPE_INVALID ||
 		    !cqe->sg.seg_addr) {
 			if (!processed_cqe)
