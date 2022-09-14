@@ -1472,20 +1472,26 @@ static int mpam_dt_parse_resource(struct mpam_msc *msc, struct device_node *np,
 	int err = 0;
 	u32 level = 0;
 	unsigned long cache_id;
-	struct device_node *cache;
+	struct device_node *cache = NULL;
 
 	do {
-		if (of_device_is_compatible(np, "arm,mpam-cache")) {
+		if (!of_property_match_string(np->parent, "device_type",
+                                             "memory")) {
+			err = mpam_ris_create(msc, ris_idx, MPAM_CLASS_MEMORY,
+                                               0x4, 0x0);
+			break;
+		} else if (of_device_is_compatible(np, "arm,mpam-cache")) {
 			cache = of_parse_phandle(np, "arm,mpam-device", 0);
 			if (!cache) {
 				pr_err("Failed to read phandle\n");
 				break;
 			}
 		} else if (of_device_is_compatible(np->parent, "cache")) {
-			cache = np->parent;
+			cache = of_node_get(np->parent);
 		} else {
 			/* For now, only caches are supported */
 			cache = NULL;
+			pr_err("Nither cache nor memory\n");
 			break;
 		}
 
