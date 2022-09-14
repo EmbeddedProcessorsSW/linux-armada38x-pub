@@ -1570,6 +1570,9 @@ static int get_msc_affinity(struct mpam_msc *msc)
 		if (of_device_is_compatible(parent, "cache")) {
 			err = get_cpumask_from_cache(parent,
 						     &msc->accessibility);
+		} else if (!of_property_match_string(parent, "device_type", "memory")) {
+			cpumask_copy(&msc->accessibility, cpumask_of_node(0));
+			err = 0;
 		} else {
 			err = -EINVAL;
 			pr_err("Cannot determine accessibility of MSC: %s\n",
