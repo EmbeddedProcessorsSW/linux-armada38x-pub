@@ -65,6 +65,9 @@ static char last_cmd_status_buf[512];
 
 struct dentry *debugfs_resctrl;
 
+/* Enable wacky behaviour that is not supported upstream. */
+DEFINE_STATIC_KEY_FALSE(resctrl_abi_playground);
+
 void rdt_last_cmd_clear(void)
 {
 	lockdep_assert_held(&rdtgroup_mutex);
@@ -2153,12 +2156,51 @@ static void schemata_list_destroy(void)
 	}
 }
 
+static void hack_file_mode(const char *name, u16 mode)
+{
+	struct rftype *rfts, *rft;
+	int len;
+
+	mutex_lock(&rdtgroup_mutex);
+
+	rfts = res_common_files;
+	len = ARRAY_SIZE(res_common_files);
+
+	for (rft = rfts; rft < rfts + len; rft++) {
+		if (!strcmp(rft->name, name))
+			rft->mode = mode;
+	}
+
+	mutex_unlock(&rdtgroup_mutex);
+}
+
+static void enable_abi_playground(void)
+{
+	static_key_enable(&resctrl_abi_playground.key);
+
+	/* Make the tasks file read only */
+	if (IS_ENABLED(CONFIG_CGROUP_RESCTRL))
+		hack_file_mode("tasks", 0444);
+}
+
+static void disable_abi_playground(void)
+{
+	static_key_disable(&resctrl_abi_playground.key);
+
+	/* Make the tasks file read/write only */
+	if (IS_ENABLED(CONFIG_CGROUP_RESCTRL))
+		hack_file_mode("tasks", 0644);
+}
+
 static int rdt_get_tree(struct fs_context *fc)
 {
 	struct rdt_resource *l3 = resctrl_arch_get_resource(RDT_RESOURCE_L3);
 	struct rdt_fs_context *ctx = rdt_fc2context(fc);
 	struct rdt_domain *dom;
 	int ret;
+
+	if (ctx->enable_abi_playground)
+		enable_abi_playground();
 
 	cpus_read_lock();
 	mutex_lock(&rdtgroup_mutex);
@@ -2254,6 +2296,7 @@ enum rdt_param {
 	Opt_cdp,
 	Opt_cdpl2,
 	Opt_mba_mbps,
+	Opt_not_abi_playground,
 	nr__rdt_params
 };
 
@@ -2261,6 +2304,13 @@ static const struct fs_parameter_spec rdt_fs_parameters[] = {
 	fsparam_flag("cdp",		Opt_cdp),
 	fsparam_flag("cdpl2",		Opt_cdpl2),
 	fsparam_flag("mba_MBps",	Opt_mba_mbps),
+
+	/*
+	 * Some of MPAM's out of tree code exposes things through resctrl
+	 * that need much more discussion before they are considered for
+	 * mainline. Add a mount option that can be used to hide these crimes.
+	 */
+	fsparam_flag("this_is_not_abi",	Opt_not_abi_playground),
 	{}
 };
 
@@ -2285,6 +2335,9 @@ static int rdt_parse_param(struct fs_context *fc, struct fs_parameter *param)
 		if (!supports_mba_mbps())
 			return -EINVAL;
 		ctx->enable_mba_mbps = true;
+		return 0;
+	case Opt_not_abi_playground:
+		ctx->enable_abi_playground = true;
 		return 0;
 	}
 
@@ -2454,6 +2507,9 @@ static void rdt_kill_sb(struct super_block *sb)
 	kernfs_kill_sb(sb);
 	mutex_unlock(&rdtgroup_mutex);
 	cpus_read_unlock();
+
+	if (static_branch_unlikely(&resctrl_abi_playground))
+		disable_abi_playground();
 }
 
 static struct file_system_type rdt_fs_type = {
@@ -3225,6 +3281,9 @@ static int rdtgroup_show_options(struct seq_file *seq, struct kernfs_root *kf)
 
 	if (is_mba_sc(resctrl_arch_get_resource(RDT_RESOURCE_MBA)))
 		seq_puts(seq, ",mba_MBps");
+
+	if (static_branch_unlikely(&resctrl_abi_playground))
+		seq_puts(seq, ",this_is_not_abi");
 
 	return 0;
 }
