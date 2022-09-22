@@ -317,4 +317,7 @@ void cqm_handle_limbo(struct work_struct *work);
 bool has_busy_rmid(struct rdt_resource *r, struct rdt_domain *d);
 void __check_limbo(struct rdt_domain *d, bool force_free);
 
+void resctrl_cgroup_relabel_task(struct task_struct *task, u32 closid, u32 rmid, struct cpumask *dirty_cpus);
+void resctrl_sync_task(void *task);
+
 #endif /* _FS_RESCTRL_INTERNAL_H */
