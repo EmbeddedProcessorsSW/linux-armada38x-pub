@@ -28,6 +28,7 @@
 #include <linux/mm_inline.h>
 #include <linux/page_ext.h>
 #include <linux/page_owner.h>
+#include <linux/tick.h>
 
 #include "internal.h"
 
@@ -1977,19 +1978,23 @@ static void vmstat_update(struct work_struct *w)
  */
 void quiet_vmstat(void)
 {
+	struct delayed_work *dw;
+
 	if (system_state != SYSTEM_RUNNING)
 		return;
 
 	if (!is_vmstat_dirty())
 		return;
 
-	/*
-	 * Just refresh counters and do not care about the pending delayed
-	 * vmstat_update. It doesn't fire that often to matter and canceling
-	 * it would be too expensive from this path.
-	 * vmstat_shepherd will take care about that for us.
-	 */
 	refresh_cpu_vm_stats(false);
+
+	/*
+	 * If the tick is stopped, cancel any delayed work to avoid
+	 * interruptions to this CPU in the future.
+	 */
+	dw = &per_cpu(vmstat_work, smp_processor_id());
+	if (delayed_work_pending(dw) && tick_nohz_tick_stopped())
+		cancel_delayed_work(dw);
 }
 
 /*
@@ -2029,6 +2034,9 @@ static void vmstat_shepherd(struct work_struct *w)
 	/* Check processors whose vmstat worker threads have been disabled */
 	for_each_online_cpu(cpu) {
 		struct delayed_work *dw = &per_cpu(vmstat_work, cpu);
+
+		if (tick_nohz_tick_stopped_cpu(cpu))
+			continue;
 
 		if (!delayed_work_pending(dw) && per_cpu(vmstat_dirty, cpu))
 			queue_delayed_work_on(cpu, mm_percpu_wq, dw, 0);
