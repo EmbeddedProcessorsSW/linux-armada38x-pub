@@ -20,6 +20,8 @@
 #define TAD_PRF_OFFSET		0x900
 #define TAD_PRF(counter)	(TAD_PRF_OFFSET | (counter << 3))
 #define TAD_PRF_CNTSEL_MASK	0xFF
+#define TAD_PRF_MATCH_PARTID	(1 << 8)
+#define TAD_PRF_PARTID_NS	(1 << 10)
 #define TAD_MAX_COUNTERS	8
 
 #define to_tad_pmu(p) (container_of(p, struct tad_pmu, pmu))
@@ -83,21 +85,32 @@ static void tad_pmu_event_counter_start(struct perf_event *event, int flags)
 	struct hw_perf_event *hwc = &event->hw;
 	u32 event_idx = event->attr.config;
 	u32 counter_idx = hwc->idx;
+	u32 partid_filter = 0;
 	u64 reg_val;
+	u32 partid;
 	int i;
 
 	hwc->state = 0;
+
+	/* Extract the partid (if any) passed by user */
+	partid = event->attr.config1 & 0x3f;
 
 	/* Typically TAD_PFC() are zeroed to start counting */
 	for (i = 0; i < tad_pmu->region_cnt; i++)
 		writeq_relaxed(0, tad_pmu->regions[i].base +
 			       TAD_PFC(counter_idx));
 
+	/* Only some counters are filterable by MPAM */
+	if (partid && (event_idx > 0x19) && (event_idx < 0x21))
+		partid_filter = TAD_PRF_MATCH_PARTID | TAD_PRF_PARTID_NS |
+				(partid << 11);
+
 	/* TAD()_PFC() start counting on the write
 	 * which sets TAD()_PRF()[CNTSEL] != 0
 	 */
 	for (i = 0; i < tad_pmu->region_cnt; i++) {
 		reg_val = event_idx & 0xFF;
+		reg_val |= partid_filter;
 		writeq_relaxed(reg_val,	tad_pmu->regions[i].base +
 			       TAD_PRF(counter_idx));
 	}
@@ -216,9 +229,11 @@ static const struct attribute_group tad_pmu_events_attr_group = {
 };
 
 PMU_FORMAT_ATTR(event, "config:0-7");
+PMU_FORMAT_ATTR(partid, "config1:0-15");
 
 static struct attribute *tad_pmu_format_attrs[] = {
 	&format_attr_event.attr,
+	&format_attr_partid.attr,
 	NULL
 };
 
