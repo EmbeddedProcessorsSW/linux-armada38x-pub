@@ -7467,6 +7467,7 @@ F:	drivers/edac/mpc85xx_edac.[ch]
 
 EDAC-OCTEONTX
 M:	Vasyl Gomonovych <vgomonovych@marvell.com>
+M:	Piyush Malgujar <pmalgujar@marvell.com>
 S:	Maintained
 F:	drivers/edac/octeontx_edac.c
 
