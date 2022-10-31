@@ -18,6 +18,8 @@
 #include "coresight-etm-perf.h"
 #include "coresight-priv.h"
 #include "coresight-tmc.h"
+#include "coresight-tmc-secure-etr.h"
+
 
 struct etr_flat_buf {
 	struct device	*dev;
@@ -811,10 +813,13 @@ static inline void tmc_etr_disable_catu(struct tmc_drvdata *drvdata)
 		helper_ops(catu)->disable(catu, drvdata->etr_buf);
 }
 
+extern const struct etr_buf_operations etr_secure_buf_ops;
+
 static const struct etr_buf_operations *etr_buf_ops[] = {
 	[ETR_MODE_FLAT] = &etr_flat_buf_ops,
 	[ETR_MODE_ETR_SG] = &etr_sg_buf_ops,
 	[ETR_MODE_CATU] = NULL,
+	[ETR_MODE_SECURE] = &etr_secure_buf_ops,
 };
 
 void tmc_etr_set_catu_ops(const struct etr_buf_operations *catu)
@@ -840,6 +845,7 @@ static inline int tmc_etr_mode_alloc_buf(int mode,
 	case ETR_MODE_FLAT:
 	case ETR_MODE_ETR_SG:
 	case ETR_MODE_CATU:
+	case ETR_MODE_SECURE:
 		if (etr_buf_ops[mode] && etr_buf_ops[mode]->alloc)
 			rc = etr_buf_ops[mode]->alloc(drvdata, etr_buf,
 						      node, pages);
@@ -881,6 +887,12 @@ static struct etr_buf *tmc_alloc_etr_buf(struct tmc_drvdata *drvdata,
 
 	etr_buf->size = size;
 
+	if (drvdata->etr_quirks & CORESIGHT_QUIRK_ETR_SECURE_BUFF) {
+		rc = tmc_etr_mode_alloc_buf(ETR_MODE_SECURE, drvdata,
+					    etr_buf, node, pages);
+		goto done;
+	}
+
 	/*
 	 * If we have to use an existing list of pages, we cannot reliably
 	 * use a contiguous DMA memory (even if we have an IOMMU). Otherwise,
@@ -903,6 +915,8 @@ static struct etr_buf *tmc_alloc_etr_buf(struct tmc_drvdata *drvdata,
 	if (rc && has_catu)
 		rc = tmc_etr_mode_alloc_buf(ETR_MODE_CATU, drvdata,
 					    etr_buf, node, pages);
+
+done:
 	if (rc) {
 		kfree(etr_buf);
 		return ERR_PTR(rc);
@@ -992,10 +1006,16 @@ static void __tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
 
 	CS_UNLOCK(drvdata->base);
 
+	if (drvdata->etr_quirks & CORESIGHT_QUIRK_ETR_RESET_CTL_REG)
+		tmc_disable_hw(drvdata);
+
 	/* Wait for TMCSReady bit to be set */
 	tmc_wait_for_tmcready(drvdata);
 
-	writel_relaxed(etr_buf->size / 4, drvdata->base + TMC_RSZ);
+	if (drvdata->etr_quirks & CORESIGHT_QUIRK_ETR_BUFFSIZE_8BX)
+		writel_relaxed(etr_buf->size / 8, drvdata->base + TMC_RSZ);
+	else
+		writel_relaxed(etr_buf->size / 4, drvdata->base + TMC_RSZ);
 	writel_relaxed(TMC_MODE_CIRCULAR_BUFFER, drvdata->base + TMC_MODE);
 
 	axictl = readl_relaxed(drvdata->base + TMC_AXICTL);
@@ -1223,6 +1243,11 @@ out:
 	/* Free memory outside the spinlock if need be */
 	if (free_buf)
 		tmc_etr_free_sysfs_buf(free_buf);
+
+	if (!ret && (drvdata->etr_quirks & CORESIGHT_QUIRK_ETM_SW_SYNC) &&
+	    (drvdata->mode != CS_MODE_READ_PREVBOOT))
+		smp_call_function_single(drvdata->rc_cpu, tmc_etr_timer_start,
+					 drvdata, true);
 
 	if (!ret)
 		dev_dbg(&csdev->dev, "TMC-ETR enabled\n");
@@ -1672,6 +1697,10 @@ static int tmc_disable_etr_sink(struct coresight_device *csdev)
 {
 	unsigned long flags;
 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+	u32 mode;
+
+	/* Cache the drvdata->mode */
+	mode = drvdata->mode;
 
 	spin_lock_irqsave(&drvdata->spinlock, flags);
 
@@ -1695,6 +1724,11 @@ static int tmc_disable_etr_sink(struct coresight_device *csdev)
 	drvdata->perf_buf = NULL;
 
 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+
+	if ((drvdata->etr_quirks & CORESIGHT_QUIRK_ETM_SW_SYNC) &&
+	    (mode == CS_MODE_SYSFS))
+		smp_call_function_single(drvdata->rc_cpu, tmc_etr_timer_cancel,
+					 drvdata, true);
 
 	dev_dbg(&csdev->dev, "TMC-ETR disabled\n");
 	return 0;
@@ -1720,6 +1754,20 @@ int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
 	/* config types are set a boot time and never change */
 	if (WARN_ON_ONCE(drvdata->config_type != TMC_CONFIG_TYPE_ETR))
 		return -EINVAL;
+
+	if (drvdata->mode == CS_MODE_READ_PREVBOOT) {
+		/* Initialize drvdata for reading trace data from last boot */
+		ret = tmc_enable_etr_sink_sysfs(drvdata->csdev);
+		if (ret)
+			return ret;
+		/* Update the buffer offset, len */
+		tmc_etr_sync_sysfs_buf(drvdata);
+		return 0;
+	}
+
+	if (drvdata->etr_quirks & CORESIGHT_QUIRK_ETR_NO_STOP_FLUSH)
+		smp_call_function_single(drvdata->rc_cpu, tmc_flushstop_etm_off,
+					 drvdata, true);
 
 	spin_lock_irqsave(&drvdata->spinlock, flags);
 	if (drvdata->reading) {
@@ -1782,6 +1830,11 @@ int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata)
 	/* Free allocated memory out side of the spinlock */
 	if (sysfs_buf)
 		tmc_etr_free_sysfs_buf(sysfs_buf);
+
+	if ((drvdata->mode == CS_MODE_SYSFS) &&
+	    (drvdata->etr_quirks & CORESIGHT_QUIRK_ETR_NO_STOP_FLUSH))
+		smp_call_function_single(drvdata->rc_cpu, tmc_flushstop_etm_on,
+					 drvdata, true);
 
 	return 0;
 }
