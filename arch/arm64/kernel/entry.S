@@ -201,6 +201,9 @@ alternative_cb_end
 #else
 	.macro	kernel_entry, el, regsize = 64
 #endif
+	.if	\el == 0
+	alternative_insn nop, SET_PSTATE_DIT(1), ARM64_HAS_DIT
+	.endif
 	.if	\regsize == 32
 	mov	w0, w0				// zero upper 32 bits of x0
 	.endif
