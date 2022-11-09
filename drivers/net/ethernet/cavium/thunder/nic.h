@@ -52,6 +52,12 @@
 /* Max when CPI_ALG is IP diffserv */
 #define	NIC_MAX_CPI_PER_LMAC		64
 
+#define	NIC_LBK_PKIO			0
+#define	NIC_LBK_VNIC			1
+#define	NIC_LBK_PKIO_LMAC		16
+#define	NIC_LBK_VNIC_LMAC		17
+#define	NIC_LBK_CHAN_BASE		128
+
 /* NIC VF Interrupts */
 #define	NICVF_INTR_CQ			0
 #define	NICVF_INTR_SQ			1
@@ -378,6 +384,7 @@ struct nicvf {
 	bool			pf_acked;
 	bool			pf_nacked;
 	bool			set_mac_pending;
+	bool			lbk_mode;
 } ____cacheline_aligned_in_smp;
 
 /* PF <--> VF Mailbox communication
@@ -429,6 +436,7 @@ struct nic_cfg_msg {
 	u8    tns_mode:1;
 	u8    sqs_mode:1;
 	u8    loopback_supported:1;
+	u8    lbk_mode:1;
 	u8    mac_addr[ETH_ALEN];
 };
 

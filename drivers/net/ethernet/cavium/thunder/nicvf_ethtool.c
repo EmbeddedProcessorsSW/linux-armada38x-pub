@@ -791,7 +791,8 @@ static void nicvf_get_pauseparam(struct net_device *dev,
 	/* Supported only for 10G/40G interfaces */
 	if ((nic->mac_type == BGX_MODE_SGMII) ||
 	    (nic->mac_type == BGX_MODE_QSGMII) ||
-	    (nic->mac_type == BGX_MODE_RGMII))
+	    (nic->mac_type == BGX_MODE_RGMII) ||
+	    (nic->mac_type == LBK_MODE_LMAC))
 		return;
 
 	mbx.pfc.msg = NIC_MBOX_MSG_PFC;
@@ -812,7 +813,8 @@ static int nicvf_set_pauseparam(struct net_device *dev,
 	/* Supported only for 10G/40G interfaces */
 	if ((nic->mac_type == BGX_MODE_SGMII) ||
 	    (nic->mac_type == BGX_MODE_QSGMII) ||
-	    (nic->mac_type == BGX_MODE_RGMII))
+	    (nic->mac_type == BGX_MODE_RGMII) ||
+	    (nic->mac_type == LBK_MODE_LMAC))
 		return -EOPNOTSUPP;
 
 	if (pause->autoneg)
