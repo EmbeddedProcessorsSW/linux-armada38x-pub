@@ -580,12 +580,13 @@ static void bgx_sgmii_change_link_state(struct lmac *lmac)
 	}
 	bgx_reg_write(bgx, lmac->lmacid, BGX_GMP_PCS_MISCX_CTL, misc_ctl);
 	bgx_reg_write(bgx, lmac->lmacid, BGX_GMP_GMI_PRTX_CFG, port_cfg);
-
-	bgx_reg_modify(bgx, lmac->lmacid, BGX_GMP_PCS_MRX_CTL,
-		       PCS_MRX_CTL_RESET);
-	if (bgx_poll_reg(bgx, lmac->lmacid, BGX_GMP_PCS_MRX_CTL,
-			 PCS_MRX_CTL_RESET, true)) {
-		dev_err(&bgx->pdev->dev, "BGX PCS reset not completed\n");
+	if (!bgx->is_rgx) {
+		bgx_reg_modify(bgx, lmac->lmacid, BGX_GMP_PCS_MRX_CTL,
+			       PCS_MRX_CTL_RESET);
+		if (bgx_poll_reg(bgx, lmac->lmacid, BGX_GMP_PCS_MRX_CTL,
+				 PCS_MRX_CTL_RESET, true)) {
+			dev_err(&bgx->pdev->dev, "BGX PCS reset not completed\n");
+		}
 	}
 
 	/* Restore CMR config settings */
@@ -600,31 +601,17 @@ static void bgx_lmac_handler(struct net_device *netdev)
 {
 	struct lmac *lmac = container_of(netdev, struct lmac, netdev);
 	struct phy_device *phydev;
-	int link_changed = 0;
 
 	phydev = lmac->phydev;
 
-	if (!phydev->link && lmac->last_link)
-		link_changed = -1;
-
-	if (phydev->link &&
-	    (lmac->last_duplex != phydev->duplex ||
-	     lmac->last_link != phydev->link ||
-	     lmac->last_speed != phydev->speed)) {
-			link_changed = 1;
-	}
+	if (phydev->link == 1)
+		lmac->link_up = true;
+	else
+		lmac->link_up = false;
 
 	lmac->last_link = phydev->link;
 	lmac->last_speed = phydev->speed;
 	lmac->last_duplex = phydev->duplex;
-
-	if (!link_changed)
-		return;
-
-	if (link_changed > 0)
-		lmac->link_up = true;
-	else
-		lmac->link_up = false;
 
 	if (lmac->is_sgmii)
 		bgx_sgmii_change_link_state(lmac);
