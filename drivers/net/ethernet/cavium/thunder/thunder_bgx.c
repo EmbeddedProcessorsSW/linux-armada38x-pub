@@ -83,6 +83,9 @@ static int lmac_count; /* Total no of LMACs in system */
 static int bgx_xaui_check_link(struct lmac *lmac);
 static int bgx_lmac_sgmii_init(struct bgx *bgx, struct lmac *lmac);
 
+static int (*bgx_port_ctx_set)(int node, int bgx, int lmac, int ctx,
+			       int dp_idx);
+
 /* Supported devices */
 static const struct pci_device_id bgx_id_table[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, PCI_DEVICE_ID_THUNDER_BGX) },
@@ -203,6 +206,20 @@ int bgx_get_lmac_count(int node, int bgx_idx)
 }
 EXPORT_SYMBOL(bgx_get_lmac_count);
 
+/* Return the BGX CSR block base address and size.*/
+u64 bgx_get_reg_base(int node, int bgx_idx, u64 *iosize)
+{
+	struct bgx *bgx;
+
+	bgx = get_bgx(node, bgx_idx);
+	if (bgx) {
+		*iosize = pci_resource_len(bgx->pdev, 0);
+		return pci_resource_start(bgx->pdev, 0);
+	}
+	return 0;
+}
+EXPORT_SYMBOL(bgx_get_reg_base);
+
 unsigned long bgx_get_lmac_bmap(int node, int bgx_idx)
 {
 	struct bgx *bgx;
@@ -255,6 +272,44 @@ void bgx_set_lmac_mac(int node, int bgx_idx, int lmacid, const u8 *mac)
 	ether_addr_copy(bgx->lmac[lmacid].mac, mac);
 }
 EXPORT_SYMBOL(bgx_set_lmac_mac);
+
+void bgx_init_ctx_set_cb(const void *cb)
+{
+	bgx_port_ctx_set = cb;
+}
+EXPORT_SYMBOL(bgx_init_ctx_set_cb);
+
+void bgx_switch_ctx(int node, int bgx_idx, int lmacid, int ctx, int dp_idx)
+{
+	if (bgx_port_ctx_set)
+		bgx_port_ctx_set(node, bgx_idx, lmacid, ctx, dp_idx);
+}
+EXPORT_SYMBOL(bgx_switch_ctx);
+
+static void bgx_enable_rx_tx(int node, int bgx_idx, int lmacid)
+{
+	bgx_lmac_rx_tx_enable(node, bgx_idx, lmacid, 1);
+}
+
+static void bgx_disable_rx_tx(int node, int bgx_idx, int lmacid)
+{
+	bgx_lmac_rx_tx_enable(node, bgx_idx, lmacid, 0);
+}
+
+struct thunder_bgx_com_s thunder_bgx_com = {
+	.get_bgx_count = bgx_get_map,
+	.get_reg_base = bgx_get_reg_base,
+	.get_lmac_count = bgx_get_lmac_count,
+	.get_link_status = bgx_get_lmac_link_state,
+	.set_link_state = bgx_set_lmac_link_state,
+	.get_mac_addr = bgx_get_lmac_mac,
+	.set_mac_addr = bgx_set_lmac_mac,
+	.enable = bgx_enable_rx_tx,
+	.disable = bgx_disable_rx_tx,
+	.init_ctx_set_cb = bgx_init_ctx_set_cb,
+	.switch_ctx = bgx_switch_ctx,
+};
+EXPORT_SYMBOL(thunder_bgx_com);
 
 static void bgx_flush_dmac_cam_filter(struct bgx *bgx, int lmacid)
 {
@@ -853,6 +908,137 @@ static int bgx_lmac_xaui_init(struct bgx *bgx, struct lmac *lmac)
 	return 0;
 }
 
+static int bgx_lmac_link_bring_up(struct bgx *bgx, struct lmac *lmac)
+{
+	int lmacid = lmac->lmacid;
+	int ret = 0;
+	u64 cfg;
+
+	if (lmac->is_sgmii) {
+		ret = bgx_lmac_sgmii_init(bgx, lmac);
+		if (ret) {
+			dev_err(&bgx->pdev->dev, "BGX %d LMAC %d init failed\n",
+				bgx->bgx_id, lmacid);
+			goto out;
+		}
+		/* Manually changing up the link state as there is no poll
+		 * function to do the job, unlike xaui/xlaui.
+		 */
+		lmac->link_up = true;
+		lmac->last_speed = 1000;
+		lmac->last_duplex = 1;
+		lmac->last_link = lmac->link_up;
+		bgx_sgmii_change_link_state(lmac);
+	} else {
+		ret = bgx_lmac_xaui_init(bgx, lmac);
+		if (ret) {
+			dev_err(&bgx->pdev->dev, "BGX %d LMAC %d init failed\n",
+				bgx->bgx_id, lmacid);
+			goto out;
+		}
+	}
+
+	cfg = bgx_reg_read(bgx, lmacid, BGX_CMRX_CFG);
+	cfg |= CMR_PKT_RX_EN | CMR_PKT_TX_EN;
+	bgx_reg_write(bgx, lmacid, BGX_CMRX_CFG, cfg);
+
+out:
+	return ret;
+}
+
+static inline void bgx_lmac_link_down(struct bgx *bgx, struct lmac *lmac)
+{
+	int lmacid = lmac->lmacid;
+	u64 cfg;
+
+	/* Disable packet reception */
+	cfg = bgx_reg_read(bgx, lmacid, BGX_CMRX_CFG);
+	cfg &= ~CMR_PKT_RX_EN;
+	bgx_reg_write(bgx, lmacid, BGX_CMRX_CFG, cfg);
+
+	/* Give chance for Rx/Tx FIFO to get drained */
+	bgx_poll_reg(bgx, lmacid, BGX_CMRX_RX_FIFO_LEN, (u64)0x1FFF, true);
+	bgx_poll_reg(bgx, lmacid, BGX_CMRX_TX_FIFO_LEN, (u64)0x3FFF, true);
+
+	/* Disable packet transmission */
+	cfg = bgx_reg_read(bgx, lmacid, BGX_CMRX_CFG);
+	cfg &= ~CMR_PKT_TX_EN;
+	bgx_reg_write(bgx, lmacid, BGX_CMRX_CFG, cfg);
+
+	/* Disable serdes lanes */
+	if (lmac->is_sgmii)
+		bgx_reg_modify(bgx, lmacid,
+			       BGX_GMP_PCS_MRX_CTL, PCS_MRX_CTL_PWR_DN);
+	else
+		bgx_reg_modify(bgx, lmacid,
+			       BGX_SPUX_CONTROL1, SPU_CTL_LOW_POWER);
+
+	/* Disable LMAC */
+	cfg = bgx_reg_read(bgx, lmacid, BGX_CMRX_CFG);
+	cfg &= ~CMR_EN;
+	bgx_reg_write(bgx, lmacid, BGX_CMRX_CFG, cfg);
+}
+
+static int bgx_lmac_link_bring_down(struct bgx *bgx, struct lmac *lmac)
+{
+	/* Calling lmac link down sequence */
+	bgx_lmac_link_down(bgx, lmac);
+
+	/* Manually changing up the link state as there is no poll
+	 * function to do the job, unlike xaui/xlaui.
+	 */
+	if (lmac->is_sgmii) {
+		lmac->link_up = false;
+		lmac->last_link = lmac->link_up;
+		lmac->last_speed = SPEED_UNKNOWN;
+		lmac->last_duplex = DUPLEX_UNKNOWN;
+		bgx_sgmii_change_link_state(lmac);
+	}
+
+	return 0;
+}
+
+int bgx_set_lmac_link_state(int node, int bgx_idx, int lmacid, bool enable)
+{
+	struct lmac *lmac;
+	struct bgx *bgx;
+	int res = 0;
+
+	bgx = get_bgx(node, bgx_idx);
+	if (!bgx)
+		return -1;
+
+	lmac = &bgx->lmac[lmacid];
+
+	/* If any local or remote fault exists, state cannot be changed */
+	if (!!(bgx_reg_read(lmac->bgx, lmac->lmacid, BGX_SMUX_RX_CTL) &
+	    SMU_RX_CTL_STATUS)) {
+		dev_err(&bgx->pdev->dev, "BGX %d LMAC %d has a fault link state\n",
+			bgx_idx, lmacid);
+		return -1;
+	}
+
+	if (enable) {
+		/* If last link state was down */
+		if (!lmac->last_link)
+			res = bgx_lmac_link_bring_up(bgx, lmac);
+		else /* No operation to perform */
+			dev_info(&bgx->pdev->dev, "BGX %d LMAC %d is already UP\n",
+				 bgx_idx, lmacid);
+	} else {
+		/* If last link state was up */
+		if (lmac->last_link)
+			res = bgx_lmac_link_bring_down(bgx, lmac);
+		else /* No operation to perform */
+			dev_info(&bgx->pdev->dev, "BGX %d LMAC %d is already DOWN\n",
+				 bgx_idx, lmacid);
+	}
+
+	/* Returning zero even if no operation performed */
+	return res;
+}
+EXPORT_SYMBOL(bgx_set_lmac_link_state);
+
 static int bgx_xaui_check_link(struct lmac *lmac)
 {
 	struct bgx *bgx = lmac->bgx;
@@ -1001,8 +1187,9 @@ next_poll:
 
 static void bgx_poll_for_link(struct work_struct *work)
 {
+	u64 spu_link, smu_link, spu_br_link, spu_bx_link, spu_br_align;
+	bool link_state_change = 0;
 	struct lmac *lmac;
-	u64 spu_link, smu_link;
 
 	lmac = container_of(work, struct lmac, dwork.work);
 	if (lmac->is_sgmii) {
@@ -1019,8 +1206,26 @@ static void bgx_poll_for_link(struct work_struct *work)
 	spu_link = bgx_reg_read(lmac->bgx, lmac->lmacid, BGX_SPUX_STATUS1);
 	smu_link = bgx_reg_read(lmac->bgx, lmac->lmacid, BGX_SMUX_RX_CTL);
 
+	/* Checking for link state change for different LMAC types */
+	/* For 10GBASE-R, XFI */
+	spu_br_link = bgx_reg_read(lmac->bgx, lmac->lmacid,
+				   BGX_SPUX_BR_STATUS1);
+	link_state_change |= !!(spu_br_link & SPU_BR_STATUS_BLK_LOCK);
+	link_state_change |= !!(spu_br_link & SPU_BR_STATUS_RCV_LNK);
+
+	/* For 40GBASE-R */
+	spu_br_align = bgx_reg_read(lmac->bgx, lmac->lmacid,
+				    BGX_SPUX_BR_ALGN_STATUS);
+	link_state_change |= !!(spu_br_align & SPU_BR_ALGN_STATUS_ALIGND);
+
+	/* For XAUI/DXAUI/RXAUI */
+	spu_bx_link = bgx_reg_read(lmac->bgx, lmac->lmacid,
+				   BGX_SPUX_BX_STATUS);
+	link_state_change |= !!(spu_bx_link & SPU_BX_STATUS_RX_ALIGN);
+
 	if ((spu_link & SPU_STATUS1_RCV_LNK) &&
-	    !(smu_link & SMU_RX_CTL_STATUS)) {
+	    !(smu_link & SMU_RX_CTL_STATUS) &&
+	    link_state_change) {
 		lmac->link_up = true;
 		if (lmac->lmac_type == BGX_MODE_XLAUI)
 			lmac->last_speed = SPEED_40000;
@@ -1144,7 +1349,6 @@ poll:
 static void bgx_lmac_disable(struct bgx *bgx, u8 lmacid)
 {
 	struct lmac *lmac;
-	u64 cfg;
 
 	lmac = &bgx->lmac[lmacid];
 	if (lmac->check_link) {
@@ -1153,32 +1357,7 @@ static void bgx_lmac_disable(struct bgx *bgx, u8 lmacid)
 		destroy_workqueue(lmac->check_link);
 	}
 
-	/* Disable packet reception */
-	cfg = bgx_reg_read(bgx, lmacid, BGX_CMRX_CFG);
-	cfg &= ~CMR_PKT_RX_EN;
-	bgx_reg_write(bgx, lmacid, BGX_CMRX_CFG, cfg);
-
-	/* Give chance for Rx/Tx FIFO to get drained */
-	bgx_poll_reg(bgx, lmacid, BGX_CMRX_RX_FIFO_LEN, (u64)0x1FFF, true);
-	bgx_poll_reg(bgx, lmacid, BGX_CMRX_TX_FIFO_LEN, (u64)0x3FFF, true);
-
-	/* Disable packet transmission */
-	cfg = bgx_reg_read(bgx, lmacid, BGX_CMRX_CFG);
-	cfg &= ~CMR_PKT_TX_EN;
-	bgx_reg_write(bgx, lmacid, BGX_CMRX_CFG, cfg);
-
-	/* Disable serdes lanes */
-        if (!lmac->is_sgmii)
-                bgx_reg_modify(bgx, lmacid,
-                               BGX_SPUX_CONTROL1, SPU_CTL_LOW_POWER);
-        else
-                bgx_reg_modify(bgx, lmacid,
-                               BGX_GMP_PCS_MRX_CTL, PCS_MRX_CTL_PWR_DN);
-
-	/* Disable LMAC */
-	cfg = bgx_reg_read(bgx, lmacid, BGX_CMRX_CFG);
-	cfg &= ~CMR_EN;
-	bgx_reg_write(bgx, lmacid, BGX_CMRX_CFG, cfg);
+	bgx_lmac_link_down(bgx, lmac);
 
 	bgx_flush_dmac_cam_filter(bgx, lmacid);
 	kfree(lmac->dmacs);

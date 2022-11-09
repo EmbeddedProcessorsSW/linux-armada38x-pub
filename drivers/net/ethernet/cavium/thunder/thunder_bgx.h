@@ -36,6 +36,8 @@
 #define  CMR_PKT_TX_EN				BIT_ULL(13)
 #define  CMR_PKT_RX_EN				BIT_ULL(14)
 #define  CMR_EN					BIT_ULL(15)
+#define CMR_X2P_SELECT_PKI			BIT_ULL(16)
+#define CMR_P2X_SELECT_PKO			BIT_ULL(17)
 #define BGX_CMR_GLOBAL_CFG		0x08
 #define  CMR_GLOBAL_CFG_FCS_STRIP		BIT_ULL(6)
 #define BGX_CMRX_RX_ID_MAP		0x60
@@ -96,6 +98,8 @@
 #define BGX_SPUX_BR_STATUS1		0x10030
 #define  SPU_BR_STATUS_BLK_LOCK			BIT_ULL(0)
 #define  SPU_BR_STATUS_RCV_LNK			BIT_ULL(12)
+#define BGX_SPUX_BR_ALGN_STATUS		0x10050
+#define  SPU_BR_ALGN_STATUS_ALIGND		BIT_ULL(12)
 #define BGX_SPUX_BR_PMD_CRTL		0x10068
 #define  SPU_PMD_CRTL_TRAIN_EN			BIT_ULL(1)
 #define BGX_SPUX_BR_PMD_LP_CUP		0x10078
@@ -227,6 +231,7 @@ int bgx_get_lmac_count(int node, int bgx);
 const u8 *bgx_get_lmac_mac(int node, int bgx_idx, int lmacid);
 void bgx_set_lmac_mac(int node, int bgx_idx, int lmacid, const u8 *mac);
 void bgx_get_lmac_link_state(int node, int bgx_idx, int lmacid, void *status);
+int bgx_set_lmac_link_state(int node, int bgx_idx, int lmacid, bool enable);
 void bgx_lmac_internal_loopback(int node, int bgx_idx,
 				int lmac_idx, bool enable);
 void bgx_config_timestamping(int node, int bgx_idx, int lmacid, bool enable);
@@ -241,6 +246,26 @@ u64 bgx_get_tx_stats(int node, int bgx_idx, int lmac, int idx);
 #define BGX_RX_STATS_COUNT 11
 #define BGX_TX_STATS_COUNT 18
 unsigned long bgx_get_lmac_bmap(int node, int bgx);
+
+struct thunder_bgx_com_s {
+	u32 (*get_bgx_count)(int node);
+	int (*get_lmac_count)(int node, int bgx_idx);
+	u64 (*get_reg_base)(int node, int bgx_idx, u64 *iosize);
+	void (*get_link_status)(int node, int bgx_idx,
+				int lmac_idx, void *status);
+	int (*set_link_state)(int node, int bgx_idx,
+			      int lmac_idx, bool enable);
+	const u8* (*get_mac_addr)(int node, int bgx_idx, int lmac_idx);
+	void (*set_mac_addr)(int node, int bgx_idx,
+			     int lmac_idx, const u8 *mac);
+	void (*enable)(int node, int bgx_idx, int lmac_idx);
+	void (*disable)(int node, int bgx_idx, int lmac_idx);
+	void (*init_ctx_set_cb)(const void *cb);
+	void (*switch_ctx)(int node, int bgx_idx, int lmac_idx,
+			   int ctx, int dp_idx);
+};
+
+extern struct thunder_bgx_com_s thunder_bgx_com;
 
 struct bgx_stats {
 	u64 rx_stats[BGX_RX_STATS_COUNT];
