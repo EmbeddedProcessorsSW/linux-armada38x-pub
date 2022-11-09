@@ -205,6 +205,12 @@ void do_exit(long error_code) __noreturn;
 extern int num_to_str(char *buf, int size,
 		      unsigned long long num, unsigned int width);
 
+#ifdef CONFIG_MRVL_OCTEONTX_EL0_INTR
+struct task_struct;
+int task_cleanup_handler_add(void (*handler)(struct task_struct *));
+int task_cleanup_handler_remove(void (*handler)(struct task_struct *));
+#endif
+
 /* lib/printf utilities */
 
 extern __printf(2, 3) int sprintf(char *buf, const char * fmt, ...);
