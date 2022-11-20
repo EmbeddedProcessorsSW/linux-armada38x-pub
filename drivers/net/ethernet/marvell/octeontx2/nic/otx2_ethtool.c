@@ -1211,7 +1211,8 @@ static void otx2_get_link_mode_info(u64 link_mode_bmap,
 	};
 	u8 bit;
 
-	for_each_set_bit(bit, (unsigned long *)&link_mode_bmap, 27) {
+	for_each_set_bit(bit, (unsigned long *)&link_mode_bmap,
+			 ARRAY_SIZE(cgx_link_mode)) {
 		/* SGMII mode is set */
 		if (bit == 0)
 			linkmode_set_bit_array(otx2_sgmii_features,
@@ -1222,11 +1223,13 @@ static void otx2_get_link_mode_info(u64 link_mode_bmap,
 	}
 
 	if (req_mode == OTX2_MODE_ADVERTISED)
-		linkmode_copy(link_ksettings->link_modes.advertising,
-			      otx2_link_modes);
+		linkmode_or(link_ksettings->link_modes.advertising,
+			    link_ksettings->link_modes.advertising,
+			    otx2_link_modes);
 	else
-		linkmode_copy(link_ksettings->link_modes.supported,
-			      otx2_link_modes);
+		linkmode_or(link_ksettings->link_modes.supported,
+			    link_ksettings->link_modes.supported,
+			    otx2_link_modes);
 }
 
 static int otx2_get_module_info(struct net_device *netdev,
