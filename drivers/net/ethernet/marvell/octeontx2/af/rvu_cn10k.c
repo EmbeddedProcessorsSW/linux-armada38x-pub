@@ -580,3 +580,12 @@ void rvu_sso_block_cn10k_init(struct rvu *rvu, int blkaddr)
 	reg &= ~BIT_ULL(4);
 	rvu_write64(rvu, blkaddr, SSO_AF_WS_CFG, reg);
 }
+
+void rvu_apr_block_cn10k_init(struct rvu *rvu)
+{
+	u64 reg;
+
+	reg = rvu_read64(rvu, BLKADDR_APR, APR_AF_LMT_CFG);
+	reg |= 0xFULL << 35;
+	rvu_write64(rvu, BLKADDR_APR, APR_AF_LMT_CFG, reg);
+}
