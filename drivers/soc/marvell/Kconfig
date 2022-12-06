@@ -35,5 +35,12 @@ config GTI_WATCHDOG
 	  address space for the application to directly poke the
 	  GTI watchdog without any kernel support and entry.
 
+config HW_CSR_ACCESS
+	tristate "Access HW Device Config Space Registers"
+	default m
+	help
+	  provides an interface which enables user space utility to read from or to write
+	  to HW Device Config Space Registers.
+
 endmenu
 
