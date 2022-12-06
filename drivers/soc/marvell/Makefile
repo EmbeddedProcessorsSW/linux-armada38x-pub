@@ -2,4 +2,4 @@
 obj-y		+= octeontx2-dpi/
 obj-y 		+= gti/
 obj-y		+= octeontx2-sdp/
-obj-y 		+= csr-access/
+obj-y 		+= hw-access/
