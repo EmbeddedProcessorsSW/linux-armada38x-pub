@@ -124,6 +124,20 @@ config OCTEONTX2_GHES
 	  This config will also make sure that this is enabled only
 	  for ARM64 platforms.
 
+config MARVELL_CN10K_EINJ
+	tristate "CN10K ECC Injection"
+	depends on ARM64 && ACPI_APEI
+	default n
+	help
+	  Provides support for error injection to CN10K
+	  Pseudo-fault Generation processor error,
+	  dram memory subsystem (DSS).
+	  This facilitates testing of the memory controller RAS features and
+	  is intended to be used by test personnel when conducting system tests.
+	  To compile this as a module, choose M here. The module will be
+	  called cn10k-einj.
+	  Unless testing, say N here.
+
 config OCTEONTX_INFO
        tristate "OcteonTX Info driver"
 	depends on PROC_FS
