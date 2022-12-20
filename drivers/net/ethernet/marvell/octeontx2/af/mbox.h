@@ -919,6 +919,8 @@ enum nix_af_status {
 	NIX_AF_ERR_AQ_CTX_RETRY_WRITE  = -430,
 	NIX_AF_ERR_LINK_CREDITS  = -431,
 	NIX_AF_ERR_RQ_CPT_MASK  = -432,
+	NIX_AF_ERR_INVALID_BPID		= -434,
+	NIX_AF_ERR_INVALID_BPID_REQ	= -435,
 };
 
 /* For NIX RX vtag action  */
