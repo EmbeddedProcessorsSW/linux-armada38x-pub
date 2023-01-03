@@ -391,6 +391,20 @@ alternative_cb_end
 	bfi	\tcr, \tmp0, \pos, #3
 	.endm
 
+	.macro __dcache_op_workaround_clean_cache_cvac op, addr
+alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
+	b       .mrvl_38891
+alternative_else
+	dc      civac, \addr
+alternative_endif
+.mrvl_38891 :
+alternative_if_not ARM64_WORKAROUND_MARVELL_38891
+	dc      \op, \addr
+alternative_else
+	dc      civac, \addr
+alternative_endif
+.endm
+
 	.macro __dcache_op_workaround_clean_cache, op, addr
 alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
 	dc	\op, \addr
@@ -419,13 +433,33 @@ alternative_endif
 	__dcache_op_workaround_clean_cache \op, \start
 	.else
 	.ifc	\op, cvac
-	__dcache_op_workaround_clean_cache \op, \start
+	__dcache_op_workaround_clean_cache_cvac \op, \start
 	.else
 	.ifc	\op, cvap
+alternative_if_not ARM64_WORKAROUND_MARVELL_38891
 	sys	3, c7, c12, 1, \start	// dc cvap
+	nops 6
+alternative_else
+	save_and_disable_daif	\tmp
+	dc	civac, \start
+	dsb	sy
+	isb
+	sys	3, c7, c12, 1, \start	// dc cvap
+	restore_daif    \tmp
+alternative_endif
 	.else
 	.ifc	\op, cvadp
+alternative_if_not ARM64_WORKAROUND_MARVELL_38891
 	sys	3, c7, c13, 1, \start	// dc cvadp
+	nops 6
+alternative_else
+	save_and_disable_daif	\tmp
+	dc	civac, \start
+	dsb	sy
+	isb
+	sys	3, c7, c12, 1, \start	// dc cvap
+	restore_daif    \tmp
+alternative_endif
 	.else
 	dc	\op, \start
 	.endif
