@@ -457,7 +457,6 @@ static void stop_isolation(struct task_struct *p)
 		per_cpu(isol_break_csd, cpu).func =
 		    fast_task_isolation_cpu_cleanup;
 		per_cpu(isol_break_csd, cpu).info = NULL;
-		per_cpu(isol_break_csd, cpu).flags = 0;
 		smp_call_function_single_async(cpu,
 					       &per_cpu(isol_break_csd, cpu));
 		put_cpu();
