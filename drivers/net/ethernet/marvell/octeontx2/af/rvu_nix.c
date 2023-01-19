@@ -717,7 +717,7 @@ int rvu_mbox_handler_nix_cpt_bp_disable(struct rvu *rvu,
 static int rvu_nix_get_bpid(struct rvu *rvu, struct nix_bp_cfg_req *req,
 			    int type, int chan_id)
 {
-	int bpid, blkaddr, vf, sdp_chan_base, err;
+	int bpid, blkaddr, sdp_chan_base, err;
 	struct rvu_hwinfo *hw = rvu->hw;
 	struct rvu_pfvf *pfvf;
 	struct nix_hw *nix_hw;
@@ -778,12 +778,7 @@ static int rvu_nix_get_bpid(struct rvu *rvu, struct nix_bp_cfg_req *req,
 		else
 			sdp_chan_base = pfvf->rx_chan_base - hw->sdp_chan_base;
 
-		/* Channel number allocation is based on VF id,
-		 * hence BPID follows similar scheme.
-		 */
-		vf = (req->hdr.pcifunc & RVU_PFVF_FUNC_MASK) - 1;
-
-		bpid = bp->cgx_bpid_cnt + req->chan_base + sdp_chan_base + vf;
+		bpid = bp->cgx_bpid_cnt + req->chan_base + sdp_chan_base;
 
 		if (req->bpid_per_chan)
 			bpid += chan_id;
