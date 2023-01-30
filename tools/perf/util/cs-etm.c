@@ -1183,10 +1183,26 @@ static int cs_etm__synth_instruction_sample(struct cs_etm_queue *etmq,
 	sample.stream_id = etmq->etm->instructions_id;
 	sample.period = period;
 	sample.cpu = tidq->packet->cpu;
-	sample.flags = tidq->prev_packet->flags;
 	sample.cpumode = event->sample.header.misc;
 
-	cs_etm__copy_insn(etmq, tidq->trace_chan_id, tidq->packet, &sample);
+	cs_etm__copy_insn(etmq, tidq->trace_chan_id, tidq->prev_packet, &sample);
+
+	/* Populate branch target information only when we encounter
+	 * branch instruction, which is at the end of tidq->prev_packet.
+	 */
+	if (addr == (tidq->prev_packet->end_addr - 4)) {
+		/* Update the perf_sample flags using the prev_packet
+		 * since that is the queue we are synthesizing.
+		 */
+		sample.flags = tidq->prev_packet->flags;
+
+		/* The last instruction of the previous queue would be a
+		 * branch operation. Get the target of that branch by looking
+		 * into the first executed instruction of the current packet
+		 * queue.
+		 */
+		sample.addr = cs_etm__first_executed_instr(tidq->packet);
+	}
 
 	if (etm->synth_opts.last_branch)
 		sample.branch_stack = tidq->last_branch;
@@ -1405,7 +1421,7 @@ static int cs_etm__sample(struct cs_etm_queue *etmq,
 	/* Get instructions remainder from previous packet */
 	instrs_prev = tidq->period_instructions;
 
-	tidq->period_instructions += tidq->packet->instr_count;
+	tidq->period_instructions += tidq->prev_packet->instr_count;
 
 	/*
 	 * Record a branch when the last instruction in
@@ -1485,8 +1501,11 @@ static int cs_etm__sample(struct cs_etm_queue *etmq,
 			 * been executed, but PC has not advanced to next
 			 * instruction)
 			 */
+			/* Get address from prev_packet since we are synthesizing
+			 * that in cs_etm__synth_instruction_sample()
+			 */
 			addr = cs_etm__instr_addr(etmq, trace_chan_id,
-						  tidq->packet, offset - 1);
+						  tidq->prev_packet, offset - 1);
 			ret = cs_etm__synth_instruction_sample(
 				etmq, tidq, addr,
 				etm->instructions_sample_period);
@@ -1550,7 +1569,7 @@ static int cs_etm__flush(struct cs_etm_queue *etmq,
 
 	/* Handle start tracing packet */
 	if (tidq->prev_packet->sample_type == CS_ETM_EMPTY)
-		goto swap_packet;
+		goto reset_last_br;
 
 	if (etmq->etm->synth_opts.last_branch &&
 	    etmq->etm->synth_opts.instructions &&
@@ -1586,8 +1605,7 @@ static int cs_etm__flush(struct cs_etm_queue *etmq,
 			return err;
 	}
 
-swap_packet:
-	cs_etm__packet_swap(etm, tidq);
+reset_last_br:
 
 	/* Reset last branches after flush the trace */
 	if (etm->synth_opts.last_branch)
