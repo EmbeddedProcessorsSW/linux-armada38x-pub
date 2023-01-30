@@ -1175,7 +1175,7 @@ static int cs_etm__synth_instruction_sample(struct cs_etm_queue *etmq,
 	event->sample.header.size = sizeof(struct perf_event_header);
 
 	if (!etm->timeless_decoding)
-		sample.time = etm->latest_kernel_timestamp;
+		sample.time = tidq->packet_queue.cs_timestamp;
 	sample.ip = addr;
 	sample.pid = tidq->pid;
 	sample.tid = tidq->tid;
@@ -1233,7 +1233,7 @@ static int cs_etm__synth_branch_sample(struct cs_etm_queue *etmq,
 	event->sample.header.size = sizeof(struct perf_event_header);
 
 	if (!etm->timeless_decoding)
-		sample.time = etm->latest_kernel_timestamp;
+		sample.time = tidq->packet_queue.cs_timestamp;
 	sample.ip = ip;
 	sample.pid = tidq->pid;
 	sample.tid = tidq->tid;
