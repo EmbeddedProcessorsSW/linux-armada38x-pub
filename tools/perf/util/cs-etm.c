@@ -1175,7 +1175,7 @@ static int cs_etm__synth_instruction_sample(struct cs_etm_queue *etmq,
 	event->sample.header.size = sizeof(struct perf_event_header);
 
 	if (!etm->timeless_decoding)
-		sample.time = tidq->packet_queue.cs_timestamp;
+		sample.time = tidq->packet_queue.prev_cs_timestamp;
 	sample.ip = addr;
 	sample.pid = tidq->pid;
 	sample.tid = tidq->tid;
@@ -1536,6 +1536,13 @@ static int cs_etm__sample(struct cs_etm_queue *etmq,
 				return ret;
 		}
 	}
+
+	/*
+	 * Since we synthesize the prev_packet, store the current timestamp
+	 * here in prev_cs_timestamp so that when we *actually* synthesize
+	 * the prev_packet, we use this timestamp and not the future one.
+	 */
+	tidq->packet_queue.prev_cs_timestamp = tidq->packet_queue.cs_timestamp;
 
 	cs_etm__packet_swap(etm, tidq);
 

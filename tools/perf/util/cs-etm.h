@@ -182,6 +182,7 @@ struct cs_etm_packet_queue {
 	u32 instr_count;
 	u64 cs_timestamp;
 	u64 next_cs_timestamp;
+	u64 prev_cs_timestamp;
 	struct cs_etm_packet packet_buffer[CS_ETM_PACKET_MAX_BUFFER];
 };
 
