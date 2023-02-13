@@ -1504,13 +1504,6 @@ static int mpam_msc_setup_error_irq(struct mpam_msc *msc)
 
 		return __setup_ppi(msc);
 
-	/* sanity check: shared interrupts can be routed anywhere? */
-	if (!cpumask_equal(&msc->accessibility, cpu_possible_mask)) {
-		pr_err_once("msc:%u is a private resource with a shared error interrupt",
-			    msc->id);
-		return -EINVAL;
-	}
-
 	return 0;
 }
 

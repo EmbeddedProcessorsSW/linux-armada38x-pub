@@ -681,9 +681,6 @@ static void mpam_resctrl_pick_mba(void)
 		if (!class_has_usable_mba(cprops))
 			continue;
 
-		if (!cpumask_equal(&class->affinity, cpu_possible_mask))
-			continue;
-
 		/*
 		 * mba_sc reads the mbm_local counter, and waggles the MBA controls.
 		 * mbm_local is implicitly part of the L3, pick a resouce to be MBA
