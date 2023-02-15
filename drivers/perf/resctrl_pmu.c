@@ -57,6 +57,7 @@ static struct rdt_resource *resctrl_event_get_resource(u16 event_num)
 	switch (event_id) {
 	case QOS_L3_OCCUP_EVENT_ID:
 	case QOS_L3_MBM_TOTAL_EVENT_ID:
+		return resctrl_arch_get_resource(RDT_RESOURCE_MBA);
 	case QOS_L3_MBM_LOCAL_EVENT_ID:
 		return resctrl_arch_get_resource(RDT_RESOURCE_L3);
 	}

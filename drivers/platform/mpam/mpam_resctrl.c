@@ -30,13 +30,18 @@ static struct mpam_resctrl_res mpam_resctrl_exports[RDT_NUM_RESOURCES];
 
 static bool exposed_alloc_capable;
 static bool exposed_mon_capable;
-static struct mpam_class *mbm_local_class;
+static struct mpam_class *mbm_local_class, *mbm_total_class;
 
 /*
  * MPAM emulates CDP by setting different PARTID in the I/D fields of MPAM1_EL1.
  * This applies globally to all traffic the CPU generates.
  */
 static bool cdp_enabled;
+
+bool resctrl_arch_is_mbm_total_enabled(void)
+{
+	return mbm_total_class;
+}
 
 /*
  * If resctrl_init() succeeded, resctrl_exit() can be used to remove support
@@ -300,6 +305,11 @@ int resctrl_arch_mon_ctx_alloc_no_wait(struct rdt_resource *r, int evtid)
 
 		return mpam_alloc_mbwu_mon(res->class);
 	case QOS_L3_MBM_TOTAL_EVENT_ID:
+		if (mpam_monitors_free_runing)
+			return USE_RMID_IDX;
+		res = container_of(r, struct mpam_resctrl_res, resctrl_res);
+
+		return mpam_alloc_mbwu_mon(res->class);
 	default:
 		return -EOPNOTSUPP;
 	}
@@ -325,6 +335,13 @@ void resctrl_arch_mon_ctx_free(struct rdt_resource *r, int evtid, int ctx)
 		wake_up(&resctrl_mon_ctx_waiters);
 		return;
 	case QOS_L3_MBM_TOTAL_EVENT_ID:
+		if (mpam_monitors_free_runing)
+			return;
+		res = container_of(r, struct mpam_resctrl_res, resctrl_res);
+
+		mpam_free_mbwu_mon(res->class, ctx);
+		wake_up(&resctrl_mon_ctx_waiters);
+		return;
 	default:
 		return;
 	}
@@ -350,6 +367,9 @@ int resctrl_arch_rmid_read(struct rdt_resource	*r, struct rdt_domain *d,
 		type = mpam_feat_msmon_mbwu;
 		break;
 	case QOS_L3_MBM_TOTAL_EVENT_ID:
+		type = mpam_feat_msmon_mbwu;
+		break;
+	default:
 		return -EOPNOTSUPP;
 	}
 
@@ -743,6 +763,7 @@ static int mpam_resctrl_resource_init(struct mpam_resctrl_res *res)
 		}
 	} else if (res->resctrl_res.rid == RDT_RESOURCE_MBA) {
 		struct mpam_props *cprops = &class->props;
+		bool has_mbwu = class_has_usable_mbwu(class);
 
 		/* TODO: kill these properties off as they are derivatives */
 		r->format_str = "%d=%0*u";
@@ -762,7 +783,17 @@ static int mpam_resctrl_resource_init(struct mpam_resctrl_res *res)
 			r->alloc_capable = true;
 			exposed_alloc_capable = true;
 		}
-	}
+
+		if (has_mbwu) {
+			r->mon_capable = true;
+			exposed_mon_capable = true;
+		}
+
+		r->num_rmid = 1;
+
+		if (class_has_usable_mbwu(class))
+			mbm_total_class = class;
+		}
 
 	return 0;
 }

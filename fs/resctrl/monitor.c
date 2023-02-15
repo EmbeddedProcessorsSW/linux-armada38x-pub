@@ -457,7 +457,8 @@ static void update_mba_bw(struct rdtgroup *rgrp, struct rdt_domain *dom_mbm)
 	struct list_head *head;
 	struct rdtgroup *entry;
 
-	if (!resctrl_arch_is_mbm_local_enabled())
+	if (!resctrl_arch_is_mbm_local_enabled() ||
+		!resctrl_arch_is_mbm_total_enabled())
 		return;
 
 	r_mba = resctrl_arch_get_resource(RDT_RESOURCE_MBA);
@@ -738,29 +739,34 @@ static struct mon_evt mbm_local_event = {
  * because as per the SDM the total and local memory bandwidth
  * are enumerated as part of L3 monitoring.
  */
-static void l3_mon_evt_init(struct rdt_resource *r)
+static void resource_mon_evt_init(struct rdt_resource *r)
 {
 	INIT_LIST_HEAD(&r->evt_list);
 
-	if (resctrl_arch_is_llc_occupancy_enabled())
+	if (resctrl_arch_is_llc_occupancy_enabled() && !strcmp(r->name, "L3"))
 		list_add_tail(&llc_occupancy_event.list, &r->evt_list);
-	if (resctrl_arch_is_mbm_total_enabled())
+	if (resctrl_arch_is_mbm_total_enabled() && !strcmp(r->name, "MB"))
 		list_add_tail(&mbm_total_event.list, &r->evt_list);
-	if (resctrl_arch_is_mbm_local_enabled())
+	if (resctrl_arch_is_mbm_local_enabled() && !strcmp(r->name, "L3"))
 		list_add_tail(&mbm_local_event.list, &r->evt_list);
 }
 
 int resctrl_mon_resource_init(void)
 {
 	struct rdt_resource *r = resctrl_arch_get_resource(RDT_RESOURCE_L3);
+	enum resctrl_res_level i;
 	int ret;
 
 	ret = dom_data_init(r);
 	if (ret)
 		return ret;
 
-	if (r->mon_capable)
-		l3_mon_evt_init(r);
+	for (i = 0; i < RDT_NUM_RESOURCES; i++) {
+		r = resctrl_arch_get_resource(i);
+
+		if (r->mon_capable)
+			resource_mon_evt_init(r);
+	}
 
 	return 0;
 }
