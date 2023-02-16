@@ -534,6 +534,7 @@ u64 coresight_read64(struct coresight_device *csdev, u32 offset);
 void coresight_relaxed_write64(struct coresight_device *csdev,
 			       u64 val, u32 offset);
 void coresight_write64(struct coresight_device *csdev, u64 val, u32 offset);
+extern void print_arch_cpu_state(int cpu);
 
 #else
 static inline struct coresight_device *
@@ -609,6 +610,8 @@ static inline void coresight_relaxed_write64(struct coresight_device *csdev,
 static inline void coresight_write64(struct coresight_device *csdev, u64 val, u32 offset)
 {
 }
+
+static void print_arch_cpu_state(int cpu) {};
 
 #endif		/* IS_ENABLED(CONFIG_CORESIGHT) */
 

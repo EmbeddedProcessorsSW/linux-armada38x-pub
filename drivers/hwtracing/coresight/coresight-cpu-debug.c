@@ -33,10 +33,16 @@
 #define EDOSLAR				0x300
 #define EDPRCR				0x310
 #define EDPRSR				0x314
-#define EDDEVID1			0xFC4
-#define EDDEVID				0xFC8
+
+#define PMPCSR				0x200
+#define PMPCSR_HI			0x204
 
 #define EDPCSR_PROHIBITED		0xFFFFFFFF
+
+#define DEVARCH_ARCHID_MASK		GENMASK(15, 0)
+#define DEVARCH_ARCHID_PMUV3		0x2A16
+#define DEVTYPE_MAJOR_MASK		GENMASK(3, 0)
+#define DEVTYPE_MAJOR_PMU		0x6
 
 /* bits definition for EDPCSR */
 #define EDPCSR_THUMB			BIT(0)
@@ -57,6 +63,12 @@
 #define EDVIDSR_E3			BIT(29)
 #define EDVIDSR_HV			BIT(28)
 #define EDVIDSR_VMID			GENMASK(7, 0)
+
+/* bits definition for PMPCSR */
+#define PMPCSR_NS			BIT(31)
+#define PMPCSR_E2			BIT(30)
+#define PMPCSR_E3			BIT(29)
+#define PMPCSR_EL_OFFSET		29
 
 /*
  * bits definition for EDDEVID1:PSCROffset
@@ -92,12 +104,15 @@ struct debug_drvdata {
 	bool		edcidsr_present;
 	bool		edvidsr_present;
 	bool		pc_has_offset;
+	bool		pmpcsr_present;
 
 	u32		edpcsr;
 	u32		edpcsr_hi;
 	u32		edprsr;
 	u32		edvidsr;
 	u32		edcidsr;
+	u32		pmpcsr;
+	u32		pmpcsr_hi;
 };
 
 static DEFINE_MUTEX(debug_lock);
@@ -197,6 +212,20 @@ static void debug_read_regs(struct debug_drvdata *drvdata)
 	/* Unlock os lock */
 	debug_os_unlock(drvdata);
 
+	if (drvdata->pmpcsr_present) {
+		/*
+		 * If a branch instruction has retired since the PE left reset state,
+		 * then the first read of PMPCSR[31:0] is permitted
+		 * but not required to return 0xFFFFFFFF.
+		 * Hence double read will ensure the actual value of the register.
+		 */
+		drvdata->pmpcsr = readl_relaxed(drvdata->base + PMPCSR);
+		drvdata->pmpcsr = readl_relaxed(drvdata->base + PMPCSR);
+		drvdata->pmpcsr_hi = readl_relaxed(drvdata->base + PMPCSR_HI);
+
+		goto cs_lock_out;
+	}
+
 	/* Save EDPRCR register */
 	save_edprcr = readl_relaxed(drvdata->base + EDPRCR);
 
@@ -239,20 +268,30 @@ out:
 	/* Restore EDPRCR register */
 	writel_relaxed(save_edprcr, drvdata->base + EDPRCR);
 
+cs_lock_out:
 	CS_LOCK(drvdata->base);
 }
 
 #ifdef CONFIG_64BIT
 static unsigned long debug_adjust_pc(struct debug_drvdata *drvdata)
 {
-	return (unsigned long)drvdata->edpcsr_hi << 32 |
-	       (unsigned long)drvdata->edpcsr;
+	if (drvdata->edpcsr_present)
+		return (unsigned long)drvdata->edpcsr_hi << 32 |
+		       (unsigned long)drvdata->edpcsr;
+	else
+		return (unsigned long)drvdata->pmpcsr_hi << 32 |
+		       (unsigned long)drvdata->pmpcsr;
 }
 #else
 static unsigned long debug_adjust_pc(struct debug_drvdata *drvdata)
 {
 	unsigned long arm_inst_offset = 0, thumb_inst_offset = 0;
 	unsigned long pc;
+
+	if (drvdata->pmpcsr_present) {
+		pc = (unsigned long)drvdata->pmpcsr;
+		return pc;
+	}
 
 	pc = (unsigned long)drvdata->edpcsr;
 
@@ -283,10 +322,49 @@ static unsigned long debug_adjust_pc(struct debug_drvdata *drvdata)
 }
 #endif
 
+static void debug_dump_pmpcsr_regs(struct debug_drvdata *drvdata)
+{
+	struct device *dev = drvdata->dev;
+	uint64_t pc;
+	uint32_t ns, el;
+
+	if (drvdata->pmpcsr == EDPCSR_PROHIBITED) {
+		dev_emerg(dev, "CPU is in Debug state or profiling is prohibited!\n");
+		return;
+	}
+
+	pc = debug_adjust_pc(drvdata);
+
+	ns = drvdata->pmpcsr_hi & PMPCSR_NS;
+	el = drvdata->pmpcsr_hi & (PMPCSR_E2 | PMPCSR_E3);
+	el = el >> PMPCSR_EL_OFFSET;
+	switch (el) {
+	case 1:
+	case 2:
+		pc = 0xff00000000000000 | pc;
+		break;
+	case 0:
+	case 3:
+		pc = 0x00ffffffffffffff & pc;
+		break;
+	default:
+		pr_err("\t\t%d - Invalid EL value:%d\n", drvdata->cpu, el);
+		return;
+	}
+
+	dev_emerg(dev, " PMPCSR: %pS (State:%s Mode:EL%d)\n",
+		  (void *)pc, ns ? "Non-secure" : "Secure", el);
+}
+
 static void debug_dump_regs(struct debug_drvdata *drvdata)
 {
 	struct device *dev = drvdata->dev;
 	unsigned long pc;
+
+	if (drvdata->pmpcsr_present) {
+		debug_dump_pmpcsr_regs(drvdata);
+		return;
+	}
 
 	dev_emerg(dev, " EDPRSR:  %08x (Power:%s DLK:%s)\n",
 		  drvdata->edprsr,
@@ -321,28 +399,53 @@ static void debug_dump_regs(struct debug_drvdata *drvdata)
 			  drvdata->edvidsr & (u32)EDVIDSR_VMID);
 }
 
+void print_arch_cpu_state(int cpu)
+{
+	struct debug_drvdata *drvdata;
+
+	drvdata = per_cpu(debug_drvdata, cpu);
+	if (!drvdata)
+		return;
+
+	debug_read_regs(drvdata);
+	debug_dump_regs(drvdata);
+}
+EXPORT_SYMBOL_GPL(print_arch_cpu_state);
+
 static void debug_init_arch_data(void *info)
 {
 	struct debug_drvdata *drvdata = info;
 	u32 mode, pcsr_offset;
-	u32 eddevid, eddevid1;
+	u32 devid, devid1;
+	u32 devarch, devtype;
+	u16 archid, major;
 
 	CS_UNLOCK(drvdata->base);
 
 	/* Read device info */
-	eddevid  = readl_relaxed(drvdata->base + EDDEVID);
-	eddevid1 = readl_relaxed(drvdata->base + EDDEVID1);
+	devid  = readl_relaxed(drvdata->base + CORESIGHT_DEVID);
+	devid1 = readl_relaxed(drvdata->base + CORESIGHT_DEVID1);
+	devtype = readl_relaxed(drvdata->base + CORESIGHT_DEVTYPE);
+	devarch = readl_relaxed(drvdata->base + CORESIGHT_DEVARCH);
 
 	CS_LOCK(drvdata->base);
 
 	/* Parse implementation feature */
-	mode = eddevid & EDDEVID_PCSAMPLE_MODE;
-	pcsr_offset = eddevid1 & EDDEVID1_PCSR_OFFSET_MASK;
+	mode = devid & EDDEVID_PCSAMPLE_MODE;
+	pcsr_offset = devid1 & EDDEVID1_PCSR_OFFSET_MASK;
+	major = devtype & DEVTYPE_MAJOR_MASK;
+	archid = devarch & DEVARCH_ARCHID_MASK;
 
 	drvdata->edpcsr_present  = false;
 	drvdata->edcidsr_present = false;
 	drvdata->edvidsr_present = false;
 	drvdata->pc_has_offset   = false;
+	drvdata->pmpcsr_present  = false;
+
+	if (mode && (major == DEVTYPE_MAJOR_PMU) && (archid >= DEVARCH_ARCHID_PMUV3)) {
+		drvdata->pmpcsr_present = true;
+		return;
+	}
 
 	switch (mode) {
 	case EDDEVID_IMPL_FULL:
@@ -600,7 +703,7 @@ static int debug_probe(struct amba_device *adev, const struct amba_id *id)
 		goto err;
 	}
 
-	if (!drvdata->edpcsr_present) {
+	if (!drvdata->edpcsr_present && !drvdata->pmpcsr_present) {
 		dev_err(dev, "CPU%d sample-based profiling isn't implemented\n",
 			drvdata->cpu);
 		ret = -ENXIO;
@@ -662,6 +765,7 @@ static const struct amba_id debug_ids[] = {
 	CS_AMBA_ID(0x000bbd09),				/* Cortex-A73 */
 	CS_AMBA_UCI_ID(0x000f0205, uci_id_debug),	/* Qualcomm Kryo */
 	CS_AMBA_UCI_ID(0x000f0211, uci_id_debug),	/* Qualcomm Kryo */
+	CS_AMBA_ID(0x000bbd49),				/* Marvell CN10K */
 	{},
 };
 
