@@ -669,6 +669,10 @@ static void mpam_ris_hw_probe(struct mpam_msc_ris *ris)
 			props->num_mbwu_mon = FIELD_GET(MPAMF_MBWUMON_IDR_NUM_MON, mbwumonidr);
 			if (props->num_mbwu_mon)
 				mpam_set_feature(mpam_feat_msmon_mbwu, props);
+
+			msc->mbwu_has_capture =	FIELD_GET(MPAMF_MBWUMON_IDR_HAS_CAPTURE, mbwumonidr);
+			msc->mbwu_has_long = FIELD_GET(MPAMF_MBWUMON_IDR_HAS_LONG, mbwumonidr);
+			msc->mbwu_lwd = FIELD_GET(MPAMF_MBWUMON_IDR_HAS_LWD, mbwumonidr);
 		}
 	}
 
@@ -827,7 +831,8 @@ static void write_msmon_ctl_flt_vals(struct mon_read *m, u32 ctl_val,
 		mpam_write_monsel_reg(msc, CFG_MBWU_FLT, flt_val);
 		mpam_write_monsel_reg(msc, CFG_MBWU_CTL, ctl_val);
 		mpam_write_monsel_reg(msc, MBWU, 0);
-		mpam_write_monsel_reg(msc, CFG_MBWU_CTL, ctl_val|MSMON_CFG_x_CTL_EN);
+		mpam_write_monsel_reg(msc, CFG_MBWU_CTL, ctl_val|MSMON_CFG_x_CTL_EN|
+					MSMON_CFG_x_CTL_CAPT_EVNT);
 
 		mbwu_state = &m->ris->mbwu_state[m->ctx->mon];
 		if (mbwu_state)
@@ -857,7 +862,7 @@ static void __ris_msmon_read(void *arg)
 	struct mpam_msc_ris *ris = m->ris;
 	struct mpam_msc *msc = m->ris->msc;
 	struct msmon_mbwu_state *mbwu_state;
-	u32 mon_sel, ctl_val, flt_val, cur_ctl, cur_flt;
+	u32 mon_sel, ctl_val, flt_val, cur_ctl, cur_flt, now_low;
 
 	spin_lock_irqsave(&msc->mon_sel_lock, flags);
 	mon_sel = FIELD_PREP(MSMON_CFG_MON_SEL_MON_SEL, ctx->mon) |
@@ -891,12 +896,47 @@ static void __ris_msmon_read(void *arg)
 		now = FIELD_GET(MSMON___VALUE, now);
 		break;
 	case mpam_feat_msmon_mbwu:
-		now = mpam_read_monsel_reg(msc, MBWU);
-		nrdy = now & MSMON___NRDY;
-		now = FIELD_GET(MSMON___VALUE, now);
+		/* If the monitor is a counter monitor such as MBWU,
+		 * implementation should clear the nrdy bit, either
+		 * doing explicit software write to clear NRDY bit or
+		 * a capture event that automatically clear the nrdy
+		 * bit, let's use the latter one.
+		 * MSMON_MBWU_CAPTURE/L_CAPTURE is written atomically by
+		 * copying all bits from MSMON_MBWU_L when the capture
+		 * event that is programmed into the configuration of this
+		 * monitor instance occurs.
+		 */
+		mpam_write_monsel_reg(msc, CAPT_EVNT, 0x1);
 
-		if (nrdy)
-			break;
+		if (msc->mbwu_has_long && msc->mbwu_has_capture &&
+			msc->mbwu_lwd) {
+			now = mpam_read_monsel_reg(msc, MBWU_L + 4);
+			nrdy = now & MSMON___NRDY;
+			if (nrdy)
+				break;
+
+			now =  mpam_read_monsel_reg(msc, MBWU_CAPTURE_L + 4);
+			now_low = mpam_read_monsel_reg(msc, MBWU_CAPTURE_L);
+			now = MSMON_MBWU_L_VALUE & (now << 32 | now_low);
+		} else if (msc->mbwu_has_long && msc->mbwu_has_capture &&
+				!msc->mbwu_lwd) {
+			now = mpam_read_monsel_reg(msc, MBWU_L + 4);
+			nrdy = now & MSMON___NRDY;
+			if (nrdy)
+				break;
+
+			now =  mpam_read_monsel_reg(msc, MBWU_CAPTURE_L + 4);
+			now_low = mpam_read_monsel_reg(msc, MBWU_CAPTURE_L);
+			now = MSMON_MBWU_L_VALUE_LWD & (now << 32 | now_low);
+		} else {
+			now = mpam_read_monsel_reg(msc, MBWU);
+			nrdy = now & MSMON___NRDY;
+			if (nrdy)
+				break;
+
+			now =  mpam_read_monsel_reg(msc, MBWU_CAPTURE);
+			now = FIELD_GET(MSMON___VALUE, now);
+		}
 
 		if (!mbwu_state)
 			break;

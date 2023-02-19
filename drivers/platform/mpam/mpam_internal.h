@@ -42,6 +42,9 @@ struct mpam_msc
 	u32			nrdy_usec;
 	cpumask_t		accessibility;
 	bool			has_extd_esr;
+	bool			mbwu_has_capture;
+	bool                    mbwu_has_long;
+	bool                    mbwu_lwd;
 
 	int				reenable_error_ppi;
 	struct mpam_msc * __percpu	*error_dev_id;
@@ -344,6 +347,8 @@ void mpam_resctrl_exit(void);
 #define MSMON_CSU_CAPTURE       0x0848  /* last cache-usage value captured */
 #define MSMON_MBWU              0x0860  /* current mem-bw usage value */
 #define MSMON_MBWU_CAPTURE      0x0868  /* last mem-bw value captured */
+#define MSMON_MBWU_L            0x0880  /* current mem-bw usage value, LONG version*/
+#define MSMON_MBWU_CAPTURE_L    0x0890  /* last mem-bw value captured, LONG version */
 #define MSMON_CAPT_EVNT         0x0808  /* signal a capture event */
 #define MPAMF_ESR               0x00F8  /* error status register */
 #define MPAMF_ECR               0x00F0  /* error control register */
@@ -400,6 +405,9 @@ void mpam_resctrl_exit(void);
 /* MPAMF_MBWUMON_IDR - MPAM memory bandwidth usage monitor ID register */
 #define MPAMF_MBWUMON_IDR_NUM_MON       GENMASK(15, 0)
 #define MPAMF_MBWUMON_IDR_HAS_CAPTURE   BIT(31)
+#define MPAMF_MBWUMON_IDR_HAS_LWD       BIT(29)
+#define MPAMF_MBWUMON_IDR_HAS_LONG      BIT(30)
+
 
 /* MPAMF_PARTID_NRW_IDR - MPAM PARTID narrowing ID register */
 #define MPAMF_PARTID_NRW_IDR_INTPARTID_MAX      GENMASK(15, 0)
@@ -541,9 +549,10 @@ void mpam_resctrl_exit(void);
  * MSMON_MBWU_CAPTURE - Memory system performance monitor memory bandwidth usage
  *                     capture register
  */
-#define MSMON___VALUE          GENMASK(30, 0)
-#define MSMON___NRDY           BIT(31)
-#define MSMON_MBWU_L_VALUE     GENMASK(62, 0)
+#define MSMON___VALUE              GENMASK(30, 0)
+#define MSMON___NRDY               BIT(31)
+#define MSMON_MBWU_L_VALUE         GENMASK(62, 0)
+#define MSMON_MBWU_L_VALUE_LWD     GENMASK(43, 0)
 /*
  * MSMON_CAPT_EVNT - Memory system performance monitoring capture event
  *                  generation register
