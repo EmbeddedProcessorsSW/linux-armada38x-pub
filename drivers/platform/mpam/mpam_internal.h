@@ -230,7 +230,7 @@ static inline int mpam_alloc_csu_mon(struct mpam_class *class)
 	if (!mpam_has_feature(mpam_feat_msmon_csu, cprops))
 		return -EOPNOTSUPP;
 
-	return ida_alloc_range(&class->ida_csu_mon, 0, cprops->num_csu_mon,
+	return ida_alloc_range(&class->ida_csu_mon, 0, cprops->num_csu_mon - 1,
                                 GFP_KERNEL);
 }
 
@@ -246,8 +246,8 @@ static inline int mpam_alloc_mbwu_mon(struct mpam_class *class)
 	if (!mpam_has_feature(mpam_feat_msmon_mbwu, cprops))
 		return -EOPNOTSUPP;
 
-	return ida_alloc_range(&class->ida_mbwu_mon, 0, cprops->num_mbwu_mon,
-                                GFP_KERNEL);
+	return ida_alloc_range(&class->ida_mbwu_mon, 0,
+			        cprops->num_mbwu_mon - 1, GFP_KERNEL);
 }
 
 static inline void mpam_free_mbwu_mon(struct mpam_class *class, int mbwu_mon)
