@@ -170,50 +170,60 @@ struct __rmid_read_arg
 {
 	u32 rmid;
 	enum resctrl_event_id eventid;
+	struct rdt_hw_resource *hw_res;
+	struct rdt_hw_domain *hw_dom;
 
-	u64 msr_val;
+	u64 val;
 	int err;
 };
 
-static void smp_call_rmid_read(void *_arg)
+static void rmid_read(void *_arg)
 {
 	struct __rmid_read_arg *arg = _arg;
-
-	arg->err = __rmid_read(arg->rmid, arg->eventid, &arg->msr_val);
-}
-
-int resctrl_arch_rmid_read(struct rdt_resource *r, struct rdt_domain *d,
-			   u32 closid, u32 rmid, enum resctrl_event_id eventid,
-			   u64 *val, int ignored)
-{
-	struct rdt_hw_resource *hw_res = resctrl_to_arch_res(r);
-	struct rdt_hw_domain *hw_dom = resctrl_to_arch_dom(d);
-	struct __rmid_read_arg arg;
+	enum resctrl_event_id eventid;
 	struct arch_mbm_state *am;
+	u32 rmid = arg->rmid;
 	u64 msr_val, chunks;
-	int err;
 
-	arg.rmid = rmid;
-	arg.eventid = eventid;
+	eventid = arg->eventid;
 
-	err = smp_call_function_any(&d->cpu_mask, smp_call_rmid_read, &arg, true);
-	if (err)
-		return err;
-	if (arg.err)
-		return arg.err;
-	msr_val = arg.msr_val;
+	arg->err = __rmid_read(rmid, eventid, &msr_val);
+	if (arg->err)
+		return;
 
-	am = get_arch_mbm_state(hw_dom, rmid, eventid);
+	am = get_arch_mbm_state(arg->hw_dom, rmid, eventid);
 	if (am) {
 		am->chunks += mbm_overflow_count(am->prev_msr, msr_val,
-						 hw_res->mbm_width);
+						 arg->hw_res->mbm_width);
 		chunks = get_corrected_mbm_count(rmid, am->chunks);
 		am->prev_msr = msr_val;
 	} else {
 		chunks = msr_val;
 	}
 
-	*val = chunks * hw_res->mon_scale;
+	arg->val = chunks * arg->hw_res->mon_scale;
+}
+
+int resctrl_arch_rmid_read(struct rdt_resource *r, struct rdt_domain *d,
+			   u32 closid, u32 rmid, enum resctrl_event_id eventid,
+			   u64 *val, int ignored)
+{
+	struct __rmid_read_arg arg;
+	int err;
+
+	arg.rmid = rmid;
+	arg.eventid = eventid;
+	arg.hw_res = resctrl_to_arch_res(r);
+	arg.hw_dom = resctrl_to_arch_dom(d);
+	arg.err = 0;
+
+	err = smp_call_function_any(&d->cpu_mask, rmid_read, &arg, true);
+	if (err)
+		return err;
+	if (arg.err)
+		return arg.err;
+
+	*val = arg.val;
 
 	return 0;
 }
