@@ -111,5 +111,16 @@ config MRVL_SWUP
             -> TIM Version check
             -> TIM Hash verification
             -> TIM firmware update
+
+config MARVELL_PTM_EP
+	tristate "Marvell PCIe PTM EP"
+	default m
+	help
+	  Provides PTM requestor(EP) support. The driver provides interface for
+	  triggering and capturing time.
+
+	  To compile this as a module, choose M here. The module will be called
+	  mrvl-ptm-ep.
+
 endmenu
 
