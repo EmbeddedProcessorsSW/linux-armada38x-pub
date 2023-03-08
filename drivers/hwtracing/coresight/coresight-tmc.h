@@ -129,6 +129,8 @@ enum tmc_mem_intf_width {
  * so we have to rely on PID of the IP to detect the functionality.
  */
 #define TMC_ETR_SAVE_RESTORE		(0x1U << 2)
+/* TMC ETR to use reserved memory for trace buffer*/
+#define TMC_ETR_RESRV_MEM		(0x1U << 3)
 
 /* Coresight SoC-600 TMC-ETR unadvertised capabilities */
 #define CORESIGHT_SOC_600_ETR_CAPS	\
@@ -142,6 +144,7 @@ enum etr_mode {
 	ETR_MODE_ETR_SG,	/* Uses in-built TMC ETR SG mechanism */
 	ETR_MODE_CATU,		/* Use SG mechanism in CATU */
 	ETR_MODE_SECURE,	/* Use Secure buffer */
+	ETR_MODE_RESRV,		/* Use reserved region contiguous buffer */
 };
 
 struct etr_buf_operations;
@@ -168,6 +171,17 @@ struct etr_buf {
 	s64				len;
 	const struct etr_buf_operations	*ops;
 	void				*private;
+};
+
+/**
+ * @paddr	: Start address of reserved memory region.
+ * @vaddr	: Corresponding CPU virtual address.
+ * @size	: Size of reserved memory region.
+ */
+struct etr_resrv_mem {
+	phys_addr_t     paddr;
+	void		*vaddr;
+	size_t		size;
 };
 
 /**
@@ -208,6 +222,7 @@ struct etr_tsync_data {
  * @idr_mutex:	Access serialisation for idr.
  * @sysfs_buf:	SYSFS buffer for ETR.
  * @perf_buf:	PERF buffer for ETR.
+ * @resrv_mem:	Reserved Memory for ETR buffer.
  */
 struct tmc_drvdata {
 	void __iomem		*base;
@@ -238,6 +253,7 @@ struct tmc_drvdata {
 	void			*etm_source;
 	struct etr_tsync_data	tsync_data;
 	struct hrtimer		timer;
+	struct etr_resrv_mem	resrv_mem;
 };
 
 struct etr_buf_operations {

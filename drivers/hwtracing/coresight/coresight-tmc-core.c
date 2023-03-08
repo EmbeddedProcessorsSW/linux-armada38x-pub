@@ -21,6 +21,7 @@
 #include <linux/spinlock.h>
 #include <linux/pm_runtime.h>
 #include <linux/of.h>
+#include <linux/of_address.h>
 #include <linux/coresight.h>
 #include <linux/amba/bus.h>
 
@@ -404,6 +405,47 @@ static inline bool tmc_etr_has_secure_access(struct tmc_drvdata *drvdata)
 	return (auth & TMC_AUTH_SID_MASK) == 0x30;
 }
 
+static bool tmc_etr_get_reserved_region(struct device *parent, void *dev_caps)
+{
+	struct tmc_drvdata *drvdata = dev_get_drvdata(parent);
+	struct device_node *node;
+	struct resource res;
+	int rc;
+
+	node = of_parse_phandle(parent->of_node, "memory-region", 0);
+	if (!node) {
+		dev_dbg(parent, "No memory-region specified\n");
+		goto out;
+	}
+
+	rc = of_address_to_resource(node, 0, &res);
+	of_node_put(node);
+	if (rc) {
+		dev_err(parent, "No address assigned to the memory-region\n");
+		goto out;
+	}
+
+	if (res.start != 0 && resource_size(&res) != 0) {
+		drvdata->resrv_mem.vaddr = memremap(res.start, resource_size(&res), MEMREMAP_WC);
+		if (IS_ERR(drvdata->resrv_mem.vaddr)) {
+			dev_err(parent, "Failed to map destination address for reserved memory\n");
+			rc = PTR_ERR(drvdata->resrv_mem.vaddr);
+			goto out;
+		}
+
+		drvdata->resrv_mem.paddr = res.start;
+		drvdata->resrv_mem.size  = resource_size(&res);
+
+		/* Size of contiguous buffer space for TMC ETR */
+		drvdata->size = drvdata->resrv_mem.size;
+	}
+
+	return true;
+
+out:
+	return false;
+}
+
 /* Detect and initialise the capabilities of a TMC ETR */
 static int tmc_etr_setup_caps(struct device *parent, u32 devid, void *dev_caps)
 {
@@ -420,6 +462,12 @@ static int tmc_etr_setup_caps(struct device *parent, u32 devid, void *dev_caps)
 
 	if (!(devid & TMC_DEVID_NOSCAT) && tmc_etr_can_use_sg(parent))
 		tmc_etr_set_cap(drvdata, TMC_ETR_SG);
+
+	/* Get reserved memory region if specified and
+	 * set capability to use reserved memory for trace buffer.
+	 */
+	if (tmc_etr_get_reserved_region(parent, dev_caps))
+		tmc_etr_set_cap(drvdata, TMC_ETR_RESRV_MEM);
 
 	/* Check if the AXI address width is available */
 	if (devid & TMC_DEVID_AXIAW_VALID)
