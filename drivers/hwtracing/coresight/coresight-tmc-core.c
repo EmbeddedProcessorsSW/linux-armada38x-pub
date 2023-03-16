@@ -496,6 +496,38 @@ static int tmc_etr_setup_caps(struct device *parent, u32 devid, void *dev_caps)
 	return rc;
 }
 
+static void tmc_parse_register_metadata_region(struct device *parent)
+{
+	struct tmc_drvdata *drvdata = dev_get_drvdata(parent);
+	const __be32 *metadata;
+	phys_addr_t paddr;
+	size_t size;
+	int len;
+
+	metadata = of_get_property(parent->of_node, "metadata-region", &len);
+	len /= sizeof(*metadata);
+
+	if (!metadata || len != 4)
+		goto out;
+
+	paddr = of_translate_address(parent->of_node, metadata);
+	size =  be32_to_cpup(metadata + 3);
+
+	if (paddr == 0 || size == 0)
+		goto out;
+
+	drvdata->reg_metadata.vaddr = memremap(paddr, size, MEMREMAP_WC);
+	if (IS_ERR_OR_NULL(drvdata->reg_metadata.vaddr)) {
+		dev_err(parent, "Failed to map destination address for registers metadata\n");
+		goto out;
+	}
+
+	drvdata->reg_metadata.paddr = paddr;
+	drvdata->reg_metadata.size = size;
+out:
+	return;
+}
+
 static u32 tmc_etr_get_default_buffer_size(struct device *dev)
 {
 	u32 size;
@@ -586,6 +618,8 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
 			goto out;
 		}
 	}
+
+	tmc_parse_register_metadata_region(dev);
 
 	desc.dev = dev;
 	desc.groups = coresight_tmc_groups;
