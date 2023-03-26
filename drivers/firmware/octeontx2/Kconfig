@@ -37,6 +37,21 @@ config MARVELL_PORTM_BOOT_CFG
 	  Currently, only cn10k platforms are supported.
 	  If unsure, say N here.
 
+config MARVELL_RETIMER_MGMT
+	bool "Marvell Retimer mgmt interface"
+	depends on HAVE_ARM_SMCCC
+	select MARVELL_UB_GEN_DRIVER
+	default n
+	help
+	  Enable sysfs interface providing basic control
+	  over Retimer device for cnf10kb platform.
+	  Each of the four devices will expose simple
+	  interface for setting GSERM index that is to be
+	  routed through the MUX and the ethernet mode -
+	  - both effective from the next boot.
+	  Currently, works only with cn10k platforms
+	  If unsure, say N here.
+
 config MARVELL_CN10K_RPRAM
 	tristate "Octeontx RPRAM configuration interface"
 	depends on HAVE_ARM_SMCCC

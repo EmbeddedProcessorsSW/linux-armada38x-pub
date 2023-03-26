@@ -12224,6 +12224,11 @@ M:	Piyush Malgujar <pmalgujar@marvell.com>
 S:	Maintained
 F:	drivers/firmware/octeontx2/rpram.c
 
+MAILBOX MARVELL RETIMER DRIVER
+M:	Damian Eppel <deppel@marvell.com>
+S:	Maintained
+F:	drivers/firmware/octeontx2/retimer-mgmt.c
+
 MAN-PAGES: MANUAL PAGES FOR LINUX -- Sections 2, 3, 4, 5, and 7
 M:	Michael Kerrisk <mtk.manpages@gmail.com>
 L:	linux-man@vger.kernel.org
