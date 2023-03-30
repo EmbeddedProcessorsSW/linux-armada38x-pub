@@ -1082,7 +1082,8 @@ static int tmc_etr_enable_hw(struct tmc_drvdata *drvdata,
 	rc = coresight_claim_device(drvdata->csdev);
 	if (!rc) {
 		drvdata->etr_buf = etr_buf;
-		__tmc_etr_enable_hw(drvdata);
+		if (drvdata->mode != CS_MODE_READ_PREVBOOT)
+			__tmc_etr_enable_hw(drvdata);
 	}
 
 	return rc;
@@ -1234,7 +1235,8 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev)
 
 	ret = tmc_etr_enable_hw(drvdata, drvdata->sysfs_buf);
 	if (!ret) {
-		drvdata->mode = CS_MODE_SYSFS;
+		if (drvdata->mode != CS_MODE_READ_PREVBOOT)
+			drvdata->mode = CS_MODE_SYSFS;
 		atomic_inc(csdev->refcnt);
 	}
 out:
@@ -1830,6 +1832,11 @@ int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata)
 	/* Free allocated memory out side of the spinlock */
 	if (sysfs_buf)
 		tmc_etr_free_sysfs_buf(sysfs_buf);
+
+	if (drvdata->buf && drvdata->mode == CS_MODE_READ_PREVBOOT) {
+		drvdata->mode = CS_MODE_DISABLED;
+		tmc_etr_disable_hw(drvdata);
+	}
 
 	if ((drvdata->mode == CS_MODE_SYSFS) &&
 	    (drvdata->etr_quirks & CORESIGHT_QUIRK_ETR_NO_STOP_FLUSH))
