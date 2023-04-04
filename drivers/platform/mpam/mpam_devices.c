@@ -19,6 +19,7 @@
 #include <linux/irqdesc.h>
 #include <linux/list.h>
 #include <linux/lockdep.h>
+#include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
@@ -122,6 +123,7 @@ static void __mpam_write_reg(struct mpam_msc *msc, u16 reg, u32 val)
 							\
 	____ret;					\
 })
+
 
 #define mpam_write_partsel_reg(msc, reg, val)			\
 ({								\
@@ -1690,10 +1692,11 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 				err = PTR_ERR(msc->pcc_chan);
 				break;
 			}
-
+#ifdef ACPI
 			prot = __acpi_get_mem_attribute(msc->pcc_chan->shmem_base_addr);
 			io = ioremap_prot(msc->pcc_chan->shmem_base_addr,
 					  msc->pcc_chan->shmem_size, pgprot_val(prot));
+#endif
 			if (IS_ERR(io)) {
 				pr_err("Failed to map MSC base address\n");
 				pcc_mbox_free_channel(msc->pcc_chan);
@@ -2323,11 +2326,13 @@ int mpam_apply_config(struct mpam_component *comp, u16 partid,
 	return 0;
 }
 
+#ifdef CONFIG_OF
 static const struct of_device_id mpam_of_match[] = {
 	{ .compatible = "arm,mpam-msc", },
 	{},
 };
 MODULE_DEVICE_TABLE(of, mpam_of_match);
+#endif
 
 static struct platform_driver mpam_msc_driver = {
 	.driver = {

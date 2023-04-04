@@ -1491,10 +1491,6 @@ static inline int find_acpi_cpu_topology_hetero_id(unsigned int cpu)
 {
 	return -EINVAL;
 }
-static inline int find_acpi_cpu_cache_topology(unsigned int cpu, int level)
-{
-	return -EINVAL;
-}
 static inline u32 acpi_pptt_count_containers(void)
 {
 	return 0;
