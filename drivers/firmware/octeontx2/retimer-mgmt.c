@@ -19,7 +19,7 @@
 #include <linux/firmware/octeontx2/mub.h>
 
 #define RETIMER_MUX_CNT 4
-#define PLAT_OCTEONTX_CONFIG_RETIMER 0xc2000b1d
+#define PLAT_OCTEONTX_CONFIG_RETIMER 0xc2000d0d
 
 struct mux_cfg {
 	u32 gserm:3;
