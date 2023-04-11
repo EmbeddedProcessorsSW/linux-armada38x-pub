@@ -24,6 +24,9 @@
 							 ((unsigned long)(a) << 24))
 #define CNF10K_RFOEX_RX_IND_MBT_CFG2(a)			(0x1428ULL | \
 							 ((unsigned long)(a) << 24))
+#define CNF10K_RFOEX_RX_MBT_STATUS(a, b)		(0xF800ULL | \
+							 ((unsigned long)(a) << 24) | \
+							 ((b) << 3))
 #define CNF10K_RFOEX_RX_IND_MBT_ADDR(a)			(0x1430ULL | \
 							 ((unsigned long)(a) << 24))
 #define CNF10K_RFOEX_RX_IND_MBT_SEG_STATE(a)		(0x1438ULL | \
