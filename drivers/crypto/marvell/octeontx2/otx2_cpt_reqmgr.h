@@ -508,7 +508,7 @@ static inline struct otx2_cpt_inst_info *otx2_cpt_info_create(struct pci_dev *pd
 
 	info->in_buffer = req->req.dptr;
 	info->dptr_baddr = req->req.dptr_dma;
-	info->rptr_baddr = req->req.dptr_dma;
+	info->rptr_baddr = req->req.rptr_dma;
 
 	info->completion_addr = (u8 *)info + info_len;
 	info->dma_len = total_mem_len - info_len;
