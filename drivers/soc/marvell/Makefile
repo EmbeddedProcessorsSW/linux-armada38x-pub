@@ -3,6 +3,7 @@ obj-y		+= octeontx2-dpi/
 obj-y 		+= gti/
 obj-y		+= octeontx2-sdp/
 obj-y 		+= hw-access/
+obj-y		+= octeontx2-serdes/
 obj-$(CONFIG_MARVELL_FWLOG) += fwlog.o
 obj-$(CONFIG_MVMDIO_UIO) += mvmdio_uio.o
 obj-$(CONFIG_MARVELL_CN10K_SERDES_DIAGNOSTICS) += cn10k_serdes_diag.o
