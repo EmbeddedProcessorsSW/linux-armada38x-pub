@@ -459,11 +459,18 @@ int cgx_lmac_addr_max_entries_get(u8 cgx_id, u8 lmac_id)
 u64 cgx_lmac_addr_get(u8 cgx_id, u8 lmac_id)
 {
 	struct cgx *cgx_dev = cgx_get_pdata(cgx_id);
-	struct lmac *lmac = lmac_pdata(lmac_id, cgx_dev);
 	struct mac_ops *mac_ops;
+	struct lmac *lmac;
 	int index;
 	u64 cfg;
 	int id;
+
+	if (!cgx_dev)
+		return 0;
+
+	lmac = lmac_pdata(lmac_id, cgx_dev);
+	if (!lmac)
+		return 0;
 
 	mac_ops = cgx_dev->mac_ops;
 
@@ -1028,6 +1035,9 @@ int cgx_lmac_pfc_config(void *cgxd, int lmac_id, u8 tx_pause,
 
 	/* Write source MAC address which will be filled into PFC packet */
 	cfg = cgx_lmac_addr_get(cgx->cgx_id, lmac_id);
+	if (!cfg)
+		return -ENODEV;
+
 	cgx_write(cgx, lmac_id, CGXX_SMUX_SMAC, cfg);
 
 	return 0;
@@ -1940,7 +1950,7 @@ bool is_higig2_enabled(void *cgxd, int lmac_id)
 static int cgx_lmac_init(struct cgx *cgx)
 {
 	struct lmac *lmac;
-	u64 lmac_list;
+	u64 lmac_list = 0;
 	int i, err;
 
 	/* lmac_list specifies which lmacs are enabled
