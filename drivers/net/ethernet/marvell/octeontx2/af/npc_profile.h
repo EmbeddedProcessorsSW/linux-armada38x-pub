@@ -15487,6 +15487,12 @@ static struct npc_mcam_kex npc_mkex_default = {
 				/* Ethertype: 2 bytes, KW0[55:40] */
 				KEX_LD_CFG(0x01, 0xc, 0x1, 0x0, 0x5),
 			},
+			[NPC_LT_LA_CPT_HDR] = {
+				/* DMAC: 6 bytes, KW1[55:8] */
+				KEX_LD_CFG(0x05, 0x0, 0x1, 0x0, NPC_KEXOF_DMAC),
+				/* Ethertype: 2 bytes, KW0[55:40] */
+				KEX_LD_CFG(0x01, 0xc, 0x1, 0x0, 0x5),
+			},
 			/* Layer A: HiGig2: */
 			[NPC_LT_LA_HIGIG2_ETHER] = {
 				/* Classification: 2 bytes, KW1[23:8] */
