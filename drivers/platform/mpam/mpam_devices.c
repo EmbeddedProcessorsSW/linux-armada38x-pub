@@ -1613,12 +1613,14 @@ static void mpam_pcc_rx_callback(struct mbox_client *cl, void *msg)
 static int mpam_msc_drv_probe(struct platform_device *pdev)
 {
 	int err;
-	pgprot_t prot;
 	char name[20];
 	void * __iomem io;
 	struct mpam_msc *msc;
 	struct resource *msc_res;
 	void *plat_data = pdev->dev.platform_data;
+#ifdef ACPI
+	pgprot_t prot;
+#endif
 
 	mutex_lock(&mpam_list_lock);
 	do {
