@@ -1827,9 +1827,63 @@ static const struct coresight_ops_sink tmc_etr_sink_ops = {
 	.free_buffer	= tmc_free_etr_buffer,
 };
 
+static int tmc_etr_panic_sync(struct coresight_device *csdev)
+{
+	u32 val;
+	struct tmc_register_snapshot *tmc;
+	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+
+	/* Make sure we have valid reserved memory */
+	if (!drvdata->reg_metadata.vaddr || !drvdata->resrv_mem.vaddr)
+		return 0;
+
+	tmc = (struct tmc_register_snapshot *)drvdata->reg_metadata.vaddr;
+	tmc->valid = 0x0;
+
+	CS_UNLOCK(drvdata->base);
+
+	/* Proceed only if ETR is enabled */
+	val = readl(drvdata->base + TMC_CTL);
+	if (!(val & TMC_CTL_CAPT_EN))
+		goto out;
+
+	tmc_flush_and_stop(drvdata);
+
+	/* Sync registers from hardware to metadata region */
+	tmc->size = readl(drvdata->base + TMC_RSZ);
+	tmc->rrphi = readl(drvdata->base + TMC_RRPHI);
+	tmc->rrp = readl(drvdata->base + TMC_RRP);
+	tmc->rwphi = readl(drvdata->base + TMC_RWPHI);
+	tmc->rwp = readl(drvdata->base + TMC_RWP);
+	tmc->sts = readl(drvdata->base + TMC_STS);
+	tmc->trc_addrhi = drvdata->resrv_mem.paddr >> 32;
+	tmc->trc_addr =  drvdata->resrv_mem.paddr & 0xffffffff;
+
+	/*
+	 * Make sure all previous writes are completed,
+	 * before we mark valid
+	 */
+	dsb(sy);
+	tmc->valid = 0x1;
+
+	tmc_disable_hw(drvdata);
+
+	dev_info(&csdev->dev, "%s: success\n", __func__);
+out:
+	CS_UNLOCK(drvdata->base);
+
+	return 0;
+}
+
+static const struct coresight_ops_panic tmc_etr_sync_ops = {
+	.sync		= tmc_etr_panic_sync,
+};
+
 const struct coresight_ops tmc_etr_cs_ops = {
 	.sink_ops	= &tmc_etr_sink_ops,
+	.panic_ops	= &tmc_etr_sync_ops,
 };
+
 
 int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
 {
