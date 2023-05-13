@@ -901,6 +901,7 @@ static inline u16 otx2_get_smq_idx(struct otx2_nic *pfvf, u16 qidx)
 	else
 		smq = pfvf->hw.txschq_list[NIX_TXSCH_LVL_SMQ][0];
 
+
 	return smq;
 }
 
