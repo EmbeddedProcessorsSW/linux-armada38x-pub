@@ -612,6 +612,32 @@
 #define ETM_CNTR_MAX_VAL		0xFFFF
 #define ETM_TRACEID_MASK		0x3f
 
+/* ETM resource group encoding */
+#define ETM_RESGRP_EXTIN		0x0
+#define ETM_RESGRP_PECMP		0x1
+#define ETM_RESGRP_CNTRSEQ		0x2
+#define ETM_RESGRP_SSCMP		0x3
+#define ETM_RESGRP_SADDRCMP		0x4
+#define ETM_RESGRP_ADDRRANGECMP		0x5
+#define ETM_RESGRP_CIDCMP		0x6
+#define ETM_RESGRP_VCIDCMP		0x7
+
+#define ETM_EXTIN_0			0x0
+
+
+/* ETM resource group encoding */
+#define ETM_RESGRP_EXTIN		0x0
+#define ETM_RESGRP_PECMP		0x1
+#define ETM_RESGRP_CNTRSEQ		0x2
+#define ETM_RESGRP_SSCMP		0x3
+#define ETM_RESGRP_SADDRCMP		0x4
+#define ETM_RESGRP_ADDRRANGECMP		0x5
+#define ETM_RESGRP_CIDCMP		0x6
+#define ETM_RESGRP_VCIDCMP		0x7
+
+#define ETM_EXTIN_0			0x0
+
+
 /* ETMv4 programming modes */
 #define ETM_MODE_EXCLUDE		BIT(0)
 #define ETM_MODE_LOAD			BIT(1)
