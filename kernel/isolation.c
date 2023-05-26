@@ -113,7 +113,6 @@ DEFINE_PER_CPU(call_single_data_t, isol_break_csd);
 
 cpumask_var_t task_isolation_map;
 cpumask_var_t task_isolation_cleanup_map;
-static DEFINE_SPINLOCK(task_isolation_cleanup_lock);
 
 /* We can run on cpus that are isolated from the scheduler and are nohz_full. */
 static int __init task_isolation_init(void)
@@ -414,7 +413,6 @@ static void fast_task_isolation_cpu_cleanup(void *info)
 static void stop_isolation(struct task_struct *p)
 {
 	int cpu, this_cpu;
-	unsigned long flags;
 
 	this_cpu = get_cpu();
 	cpu = task_cpu(p);
@@ -446,9 +444,8 @@ static void stop_isolation(struct task_struct *p)
 		 * Schedule "slow" cleanup. This relies on
 		 * TIF_NOTIFY_RESUME being set
 		 */
-		spin_lock_irqsave(&task_isolation_cleanup_lock, flags);
 		cpumask_set_cpu(cpu, task_isolation_cleanup_map);
-		spin_unlock_irqrestore(&task_isolation_cleanup_lock, flags);
+
 		/*
 		 * Setting flags is delegated to the CPU where
 		 * isolated task is running
@@ -834,16 +831,9 @@ void task_isolation_cpu_cleanup(void)
 void task_isolation_check_run_cleanup(void)
 {
 	int cpu;
-	unsigned long flags;
-
-	spin_lock_irqsave(&task_isolation_cleanup_lock, flags);
 
 	cpu = smp_processor_id();
 
-	if (cpumask_test_cpu(cpu, task_isolation_cleanup_map)) {
-		cpumask_clear_cpu(cpu, task_isolation_cleanup_map);
-		spin_unlock_irqrestore(&task_isolation_cleanup_lock, flags);
+	if (cpumask_test_and_clear_cpu(cpu, task_isolation_cleanup_map))
 		task_isolation_cpu_cleanup();
-	} else
-		spin_unlock_irqrestore(&task_isolation_cleanup_lock, flags);
 }
