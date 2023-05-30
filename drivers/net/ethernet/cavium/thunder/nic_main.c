@@ -1236,9 +1236,8 @@ static void nic_link_status_get(struct nicpf *nic, u8 vf)
 	u8 bgx, lmac;
 
 	if (is_lbkvf(nic, vf)) {
-		if (lbk_link_up[vf - bgx_lmac_cnt] !=
-		    nic->lbk_link_status[vf - bgx_lmac_cnt])
-			nic_lbk_link_update(nic, vf);
+		nic_lbk_link_update(nic, vf);
+		return;
 	}
 
 	mbx.link_status.msg = NIC_MBOX_MSG_BGX_LINK_CHANGE;
@@ -1423,6 +1422,10 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
 			ret = -1; /* NACK */
 			break;
 		}
+		if (is_lbkvf(nic, vf)) {
+			ret = 0;
+			break;
+		}
 		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
 		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
 		bgx_reset_xcast_mode(nic->node, bgx, lmac,
@@ -1433,6 +1436,10 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
 	case NIC_MBOX_MSG_ADD_MCAST:
 		if (vf >= nic->num_vf_en) {
 			ret = -1; /* NACK */
+			break;
+		}
+		if (is_lbkvf(nic, vf)) {
+			ret = 0;
 			break;
 		}
 		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
@@ -1446,6 +1453,10 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
 	case NIC_MBOX_MSG_SET_XCAST:
 		if (vf >= nic->num_vf_en) {
 			ret = -1; /* NACK */
+			break;
+		}
+		if (is_lbkvf(nic, vf)) {
+			ret = 0;
 			break;
 		}
 		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
