@@ -24,6 +24,9 @@
 #define TAD_PRF_PARTID_NS	(1 << 10)
 #define TAD_MAX_COUNTERS	8
 
+#define TAD_UNSUPP_PARTID	0x100
+#define TAD_ALLOC_ANY		0x1c
+
 #define to_tad_pmu(p) (container_of(p, struct tad_pmu, pmu))
 
 struct tad_region {
@@ -65,13 +68,21 @@ static void tad_pmu_event_counter_stop(struct perf_event *event, int flags)
 	struct tad_pmu *tad_pmu = to_tad_pmu(event->pmu);
 	struct hw_perf_event *hwc = &event->hw;
 	u32 counter_idx = hwc->idx;
+	u64 reg_val;
 	int i;
+
+	/* Write with unsupported partid before stopping the counter*/
+	reg_val = TAD_PRF_MATCH_PARTID | TAD_PRF_PARTID_NS |
+		  (TAD_UNSUPP_PARTID << 11) | TAD_ALLOC_ANY;
 
 	/* TAD()_PFC() stop counting on the write
 	 * which sets TAD()_PRF()[CNTSEL] == 0
 	 */
 	for (i = 0; i < tad_pmu->region_cnt; i++) {
-		writeq_relaxed(0, tad_pmu->regions[i].base +
+		writeq(reg_val, tad_pmu->regions[i].base +
+			       TAD_PRF(counter_idx));
+
+		writeq(0, tad_pmu->regions[i].base +
 			       TAD_PRF(counter_idx));
 	}
 
