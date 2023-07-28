@@ -18,8 +18,12 @@
 #include <linux/errno.h>
 #include <linux/err.h>
 #include <linux/spinlock.h>
+#include <linux/delay.h>
 #include <linux/arm-smccc.h>
 #include <linux/firmware/octeontx2/mub.h>
+
+/* Maximum number of retries to set/get configuration */
+#define FWMT_OCTEONTX_MEM_TEST_MAX_RETRY  50
 
 /* SMC call used to communicate with ATF */
 #define FWMT_OCTEONTX_MEM_TEST_CONFIG   0xc2000b15
@@ -67,19 +71,58 @@ static const struct fw_memtest_entry xlat_tbl[] = {
 	{ NULL, 0, FWMT_LAST }
 };
 
+static int fw_memtest_setget_config_with_retry(
+					unsigned long in_out,
+					unsigned long reboot,
+					unsigned long power_on,
+					unsigned long mem_length,
+					struct arm_smccc_res *res,
+					struct mub_fw_memtest_desc *desc)
+{
+	int ret, i;
+
+	for (i = 0; i < FWMT_OCTEONTX_MEM_TEST_MAX_RETRY; i++) {
+		ret = mub_do_smc(desc->device, FWMT_OCTEONTX_MEM_TEST_CONFIG,
+				 in_out, reboot, power_on, mem_length, 0, 0,
+				 0, res);
+		if (ret) {
+			pr_err("%s - smc call failed (%d)\n", __func__, ret);
+			return ret;
+		}
+
+		/* retry in case locking in ATF failed */
+		if ((res->a0 == -1) || (res->a0 == -2)) {
+			pr_debug("%s - locking SPI failed - retrying (%d)\n",
+				 __func__, i);
+			usleep_range(10000, 40000);
+		} else {
+			break;
+		}
+	}
+
+	if (res->a0) {
+		pr_err("%s - smc call returned error %ld after %d retries\n",
+			   __func__, res->a0, i);
+		return (int)res->a0;
+	}
+
+	if (i > 0)
+		pr_debug("%s - locking SPI finally succeeded after %d retries\n",
+				 __func__, i);
+
+	return 0;
+}
+
 static int fw_memtest_get_config(struct mub_fw_memtest_desc *desc)
 {
 	struct arm_smccc_res res;
 	int ret;
 
-	ret = mub_do_smc(desc->device,
-			 FWMT_OCTEONTX_MEM_TEST_CONFIG, FWMT_SO_GET,
-			 0, 0, 0, 0, 0, 0, &res);
+	ret = fw_memtest_setget_config_with_retry(FWMT_SO_GET, 0, 0, 0,
+						  &res, desc);
+
 	if (ret)
 		return ret;
-
-	if (res.a0)
-		return (int)res.a0;
 
 	spin_lock(&desc->lock);
 	desc->reboot = (uint32_t)res.a1;
@@ -111,14 +154,11 @@ static int fw_memtest_set_config(struct mub_fw_memtest_desc *desc)
 	mem_length |=  desc->reboot_mem_length;
 	spin_unlock(&desc->lock);
 
-	ret = mub_do_smc(desc->device,
-			 FWMT_OCTEONTX_MEM_TEST_CONFIG, FWMT_SO_SET,
-			 reboot, power_on, mem_length, 0, 0, 0, &res);
+	ret = fw_memtest_setget_config_with_retry(FWMT_SO_SET, reboot, power_on,
+						  mem_length, &res, desc);
+
 	if (ret)
 		return ret;
-
-	if (res.a0)
-		return (int)res.a0;
 
 	pr_debug("New Values are reboot: %u, reboot_mem_length: %u KB\n",
 		 reboot, lower_32_bits(mem_length));
