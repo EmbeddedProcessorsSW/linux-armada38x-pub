@@ -4,8 +4,13 @@
  *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
  */
 
+#include <linux/acpi.h>
 #include <linux/bitfield.h>
 #include <linux/bits.h>
+#ifdef CONFIG_DMI
+#include <linux/dmi.h>
+#include <asm/unaligned.h>
+#endif
 #include <linux/iopoll.h>
 #include <linux/module.h>
 #include <linux/mmc/host.h>
@@ -855,19 +860,19 @@ static int sdhci_cdns_sd4_write_phy_reg(struct sdhci_cdns_priv *priv,
 	return ret;
 }
 
-static unsigned int sdhci_cdns_sd4_phy_param_count(struct device_node *np)
+static unsigned int sdhci_cdns_sd4_phy_param_count(struct device *dev)
 {
 	unsigned int count = 0;
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(sdhci_cdns_sd4_phy_cfgs); i++)
-		if (of_property_read_bool(np, sdhci_cdns_sd4_phy_cfgs[i].property))
+		if (device_property_read_bool(dev, sdhci_cdns_sd4_phy_cfgs[i].property))
 			count++;
 
 	return count;
 }
 
-static void sdhci_cdns_sd4_phy_param_parse(struct device_node *np,
+static void sdhci_cdns_sd4_phy_param_parse(struct device *dev,
 					   struct sdhci_cdns_sd4_phy *phy)
 {
 	struct sdhci_cdns_sd4_phy_param *p = phy->phy_params;
@@ -875,8 +880,8 @@ static void sdhci_cdns_sd4_phy_param_parse(struct device_node *np,
 	int ret, i;
 
 	for (i = 0; i < ARRAY_SIZE(sdhci_cdns_sd4_phy_cfgs); i++) {
-		ret = of_property_read_u32(np, sdhci_cdns_sd4_phy_cfgs[i].property,
-					   &val);
+		ret = device_property_read_u32(dev, sdhci_cdns_sd4_phy_cfgs[i].property,
+					       &val);
 		if (ret)
 			continue;
 
@@ -1075,23 +1080,23 @@ static int sdhci_cdns_sd6_get_delay_params(struct device *dev, struct sdhci_cdns
 	struct sdhci_cdns_sd6_phy *phy = priv->phy;
 	int ret;
 
-	of_property_read_u32(dev->of_node, "cdns,iocell_input_delay", &phy->d.iocell_input_delay);
-	of_property_read_u32(dev->of_node, "cdns,iocell_output_delay", &phy->d.iocell_output_delay);
-	of_property_read_u32(dev->of_node, "cdns,delay_element", &phy->d.delay_element);
-	ret = of_property_read_u32(dev->of_node, "cdns,read_dqs_cmd_delay",
-				   &phy->settings.cp_read_dqs_cmd_delay);
+	device_property_read_u32(dev, "cdns,iocell_input_delay", &phy->d.iocell_input_delay);
+	device_property_read_u32(dev, "cdns,iocell_output_delay", &phy->d.iocell_output_delay);
+	device_property_read_u32(dev, "cdns,delay_element", &phy->d.delay_element);
+	ret = device_property_read_u32(dev, "cdns,read_dqs_cmd_delay",
+				       &phy->settings.cp_read_dqs_cmd_delay);
 	if (ret)
 		phy->settings.cp_read_dqs_cmd_delay = DEFAULT_CMD_DELAY;
 
-	ret = of_property_read_u32(dev->of_node, "cdns,tune_val_start", &tune_val_start);
+	ret = device_property_read_u32(dev, "cdns,tune_val_start", &tune_val_start);
 	if (ret)
 		tune_val_start = SDHCI_CDNS_TUNE_START;
 
-	ret = of_property_read_u32(dev->of_node, "cdns,tune_val_step", &tune_val_step);
+	ret = device_property_read_u32(dev, "cdns,tune_val_step", &tune_val_step);
 	if (ret)
 		tune_val_step = SDHCI_CDNS_TUNE_STEP;
 
-	ret = of_property_read_u32(dev->of_node, "cdns,max_tune_iter", &max_tune_iter);
+	ret = device_property_read_u32(dev, "cdns,max_tune_iter", &max_tune_iter);
 	if (ret)
 		max_tune_iter = SDHCI_CDNS_TUNE_ITERATIONS;
 
@@ -1508,7 +1513,7 @@ static int sdhci_cdns_sd4_phy_probe(struct platform_device *pdev,
 	struct sdhci_cdns_sd4_phy *phy;
 	struct device *dev = &pdev->dev;
 
-	nr_phy_params = sdhci_cdns_sd4_phy_param_count(dev->of_node);
+	nr_phy_params = sdhci_cdns_sd4_phy_param_count(dev);
 	phy = devm_kzalloc(dev, struct_size(phy, phy_params, nr_phy_params),
 			   GFP_KERNEL);
 	if (!phy)
@@ -1516,7 +1521,7 @@ static int sdhci_cdns_sd4_phy_probe(struct platform_device *pdev,
 
 	phy->nr_phy_params = nr_phy_params;
 
-	sdhci_cdns_sd4_phy_param_parse(dev->of_node, phy);
+	sdhci_cdns_sd4_phy_param_parse(dev, phy);
 	priv->phy = phy;
 
 	return 0;
@@ -1536,42 +1541,47 @@ static int sdhci_cdns_sd6_phy_probe(struct platform_device *pdev,
 	if (!phy)
 		return -ENOMEM;
 
-	clk = devm_clk_get(dev, "sdmclk");
-	if (IS_ERR(clk)) {
-		dev_err(dev, "sdmclk get error\n");
-		return PTR_ERR(clk);
-	}
+	if (!has_acpi_companion(dev)) {
+		clk = devm_clk_get(dev, "sdmclk");
+		if (IS_ERR(clk)) {
+			dev_err(dev, "sdmclk get error\n");
+			return PTR_ERR(clk);
+		}
 
-	val = clk_get_rate(clk);
+		val = clk_get_rate(clk);
+	} else {
+		if (device_property_read_u32(dev, "clock-frequency", &val))
+			// Property not found, but it's mandatory for ACPI case
+			return -ENODEV;
+	}
 	phy->t_sdmclk = DIV_ROUND_DOWN_ULL(1e12, val);
 
-	ret = of_property_read_u32(dev->of_node, "cdns,host_slew",
-				   &phy->settings.slew);
+	ret = device_property_read_u32(dev, "cdns,host_slew",
+				       &phy->settings.slew);
 	if (ret)
 		phy->settings.slew = 3;
 
-	ret = of_property_read_u32(dev->of_node, "cdns,host_drive",
-				   &phy->settings.drive);
+	ret = device_property_read_u32(dev, "cdns,host_drive",
+				       &phy->settings.drive);
 	if (ret)
 		phy->settings.drive = 2;
 
-	ret = of_property_read_u32(dev->of_node, "cdns,iocell_input_delay",
-				   &phy->d.iocell_input_delay);
+	ret = device_property_read_u32(dev, "cdns,iocell_input_delay",
+				       &phy->d.iocell_input_delay);
 	if (ret)
 		phy->d.iocell_input_delay = 2500;
 
-	ret = of_property_read_u32(dev->of_node, "cdns,iocell_output_delay",
-				   &phy->d.iocell_output_delay);
+	ret = device_property_read_u32(dev, "cdns,iocell_output_delay",
+				       &phy->d.iocell_output_delay);
 	if (ret)
 		phy->d.iocell_output_delay = 2500;
 
-	ret = of_property_read_u32(dev->of_node, "cdns,delay_element",
-				   &phy->d.delay_element);
+	ret = device_property_read_u32(dev, "cdns,delay_element",
+				       &phy->d.delay_element);
 	if (ret)
 		phy->d.delay_element = 24;
 
-	ret = of_property_read_string_index(dev->of_node, "cdns,mode", 0,
-					    &mode_name);
+	ret = device_property_read_string(dev, "cdns,mode", &mode_name);
 	if (!ret) {
 		if (!strcmp("emmc_sdr", mode_name))
 			phy->mode = MMC_TIMING_MMC_HS;
@@ -1830,6 +1840,51 @@ static void sdhci_cdns_hs400_enhanced_strobe(struct mmc_host *mmc,
 					 SDHCI_CDNS_HRS06_MODE_MMC_HS400);
 }
 
+#ifdef CONFIG_DMI
+
+static char *part_no;
+#define DMI_ENTRY_PROCESSOR_MIN_LENGTH	48
+#define DMI_PROC_PART_NUMBER		0x22
+#define DMI_MAX_STRLEN			80
+
+static void find_proc_part(const struct dmi_header *dm, void *private)
+{
+	const u8 *dmi_data = (const u8 *)dm;
+	char *ptr;
+	int i, idx;
+
+	if (dm->type == DMI_ENTRY_PROCESSOR &&
+	    dm->length >= DMI_ENTRY_PROCESSOR_MIN_LENGTH) {
+		idx = (int)get_unaligned((const u8 *)
+					 (dmi_data + DMI_PROC_PART_NUMBER));
+		ptr = (char *)(dmi_data + dm->length);
+		for (i = 1; i < idx; i++) {
+			while (*ptr)
+				ptr++;
+			ptr++;
+		}
+		strcpy(private, ptr);
+	}
+}
+#endif
+
+static int dmi_check_part_no(void)
+{
+#ifdef CONFIG_DMI
+	part_no = kcalloc(DMI_MAX_STRLEN, sizeof(char), GFP_KERNEL);
+	if ((part_no) && !dmi_walk(find_proc_part, part_no)) {
+		if (!strncmp(part_no, "MV-CN10624-A", 12) ||
+		    !strncmp(part_no, "MV-CN10624SA", 12) ||
+		    !strncmp(part_no, "MV-CN10518-A", 12)) {
+			kfree(part_no);
+			return 1;
+		}
+		kfree(part_no);
+	}
+#endif
+	return 0;
+}
+
 static int sdhci_cdns_probe(struct platform_device *pdev)
 {
 	struct sdhci_host *host;
@@ -1837,20 +1892,25 @@ static int sdhci_cdns_probe(struct platform_device *pdev)
 	struct sdhci_pltfm_host *pltfm_host;
 	struct sdhci_cdns_priv *priv;
 	struct clk *clk;
+	bool has_acpi;
 	int ret;
 	struct device *dev = &pdev->dev;
 
-	clk = devm_clk_get(dev, NULL);
-	if (IS_ERR(clk))
-		return PTR_ERR(clk);
+	has_acpi = has_acpi_companion(dev);
 
-	ret = clk_prepare_enable(clk);
-	if (ret)
-		return ret;
+	if (!has_acpi) {
+		clk = devm_clk_get(dev, NULL);
+		if (IS_ERR(clk))
+			return PTR_ERR(clk);
 
-	data = of_device_get_match_data(dev);
+		ret = clk_prepare_enable(clk);
+		if (ret)
+			return ret;
+	}
+
+	data = device_get_match_data(dev);
 	if (!data) {
-		return PTR_ERR(clk);
+		return PTR_ERR(data);
 		goto disable_clk;
 	}
 
@@ -1861,7 +1921,8 @@ static int sdhci_cdns_probe(struct platform_device *pdev)
 	}
 
 	pltfm_host = sdhci_priv(host);
-	pltfm_host->clk = clk;
+	if (!has_acpi)
+		pltfm_host->clk = clk;
 
 	host->clk_mul = 0;
 	host->max_clk = SDMCLK_MAX_FREQ;
@@ -1875,7 +1936,9 @@ static int sdhci_cdns_probe(struct platform_device *pdev)
 	host->mmc_host_ops.hs400_enhanced_strobe =
 				sdhci_cdns_hs400_enhanced_strobe;
 
-	if (is_soc_cn10ka_ax() || is_soc_cnf10ka_ax())
+	if (has_acpi)
+		cn10k_irq_workaround = dmi_check_part_no();
+	else if (is_soc_cn10ka_ax() || is_soc_cnf10ka_ax())
 		cn10k_irq_workaround = 1;
 
 	sdhci_get_of_property(pdev);
@@ -1902,7 +1965,8 @@ static int sdhci_cdns_probe(struct platform_device *pdev)
 free:
 	sdhci_pltfm_free(pdev);
 disable_clk:
-	clk_disable_unprepare(clk);
+	if (!has_acpi)
+		clk_disable_unprepare(clk);
 
 	return ret;
 }
@@ -1913,11 +1977,16 @@ static int sdhci_cdns_resume(struct device *dev)
 	struct sdhci_host *host = dev_get_drvdata(dev);
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_cdns_priv *priv = sdhci_pltfm_priv(pltfm_host);
+	bool has_acpi;
 	int ret;
 
-	ret = clk_prepare_enable(pltfm_host->clk);
-	if (ret)
-		return ret;
+	has_acpi = has_acpi_companion(dev);
+
+	if (!has_acpi) {
+		ret = clk_prepare_enable(pltfm_host->clk);
+		if (ret)
+			return ret;
+	}
 
 	ret = priv->cdns_data->phy_init(priv);
 	if (ret)
@@ -1930,7 +1999,8 @@ static int sdhci_cdns_resume(struct device *dev)
 	return 0;
 
 disable_clk:
-	clk_disable_unprepare(pltfm_host->clk);
+	if (!has_acpi)
+		clk_disable_unprepare(pltfm_host->clk);
 
 	return ret;
 }
