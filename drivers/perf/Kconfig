@@ -176,6 +176,13 @@ config MARVELL_CN10K_TAD_PMU
 	  Provides support for Last-Level cache Tag-and-data Units (LLC-TAD)
 	  performance monitors on CN10K family silicons.
 
+config MARVELL_ODYSSEY_TAD_PMU
+	tristate "MARVELL ODYSSEY LLC-TAD PMU"
+	depends on ARM64 || (COMPILE_TEST && 64BIT)
+	help
+	  Provides support for Last-Level cache Tag-and-data Units (LLC-TAD)
+	  performance monitor on Odyssey platform.
+
 config APPLE_M1_CPU_PMU
 	bool "Apple M1 CPU PMU support"
 	depends on ARM_PMU && ARCH_APPLE
