@@ -219,6 +219,7 @@ static void otx2_mbox_msg_send_data(struct otx2_mbox *mbox, int devid, u64 data)
 	struct mbox_hdr *tx_hdr, *rx_hdr;
 	void *hw_mbase = mdev->hwbase;
 	struct mbox_msghdr *msg;
+	u64 intr_val;
 
 	tx_hdr = hw_mbase + mbox->tx_start;
 	rx_hdr = hw_mbase + mbox->rx_start;
@@ -257,10 +258,15 @@ static void otx2_mbox_msg_send_data(struct otx2_mbox *mbox, int devid, u64 data)
 
 	spin_unlock(&mdev->mbox_lock);
 
+	/* Check if interrupt pending */
+	intr_val = readq((void __iomem *)mbox->reg_base +
+		     (mbox->trigger | (devid << mbox->tr_shift)));
+
+	intr_val |= data;
 	/* The interrupt should be fired after num_msgs is written
 	 * to the shared memory
 	 */
-	writeq(data, (void __iomem *)mbox->reg_base +
+	writeq(intr_val, (void __iomem *)mbox->reg_base +
 	       (mbox->trigger | (devid << mbox->tr_shift)));
 }
 
