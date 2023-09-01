@@ -100,4 +100,133 @@ config LIQUIDIO_VF
 	  will be called liquidio_vf. MSI-X interrupt support is required
 	  for this driver to work correctly
 
+config OCTEONTX_FPA_PF
+	tristate "OcteonTX free pool allocator physical function driver(FPA_PF)"
+	depends on 64BIT && PCI
+	default y
+	help
+	  Select this option to enable FPA Physical function.
+	  FPA provides hardware assisted memory management for
+	  OcteonTX coprocessors.
+
+	  To compile this as a module, choose M here.
+
+config OCTEONTX_FPA_VF
+	tristate "OcteonTX free pool allocator virtual function driver(FPA_VF)"
+	depends on 64BIT && PCI
+	default y
+	help
+	  Select this option to enable FPA Virtual function.
+	  FPA provides hardware assisted memory management for
+	  OcteonTX coprocessors. Each VF owns single FPA pool.
+
+	  To compile this as a module, choose M here.
+
+config OCTEONTX_RST
+	tristate "OcteonTX Reset driver(RST)"
+	depends on 64BIT && PCI
+	default y
+	help
+	  Select this option to enable RST.
+	  OcteonTX Reset unit controls the CN83XX chip reset.
+
+	  To compile this as a module, choose M here.
+
+config OCTEONTX_SSO_PF
+	tristate "OcteonTX SSO physical function driver(SSO_PF)"
+	depends on 64BIT && PCI && OCTEONTX_FPA_PF && OCTEONTX_FPA_VF && OCTEONTX_RST
+	default y
+	help
+	  Select this option to enable SSO Physical function.
+	  SSO is a way to submit work from Cores.
+
+	  To compile this as a module, choose M here.
+
+config OCTEONTX_SSOW_PF
+	tristate "OcteonTX SSOW physical function driver(SSOW_PF)"
+	depends on 64BIT && PCI && OCTEONTX_SSO_PF
+	default y
+	help
+	  Select this option to enable SSOW Physical function.
+	  SSOW is a way to get work for cores.
+
+	  To compile this as a module, choose M here.
+
+config OCTEONTX_PKO_PF
+	tristate "OcteonTX PKO physical function driver(PKO_PF)"
+	depends on 64BIT && PCI && OCTEONTX_FPA_PF && OCTEONTX_FPA_VF
+	default y
+	help
+	  Select this option to enable PKO Physical function.
+	  PKO block is responsible for packet transmission.
+
+	  To compile this as a module, choose M here.
+
+config OCTEONTX_LBK
+	tristate "OcteonTX Loopback Interface driver(LBK)"
+	depends on 64BIT && PCI
+	default y
+	help
+	  Select this option to enable LBK.
+	  OcteonTX Loopback Interface
+
+	  To compile this as a module, choose M here.
+
+config OCTEONTX_TIM_PF
+	tristate "OcteonTX TIM physical function driver(TIM_PF)"
+	depends on 64BIT && PCI && OCTEONTX_RST
+	default y
+	help
+	  Select this option to enable TIM Physical function.
+	  Timer hw block (TIM) enables software to schedule SSO
+	  work-queue entries for a future time.
+
+	  To compile this as a module, choose M here.
+
+config OCTEONTX_PKI
+	tristate "OcteonTX Input packet parser(PKI)"
+	depends on 64BIT && PCI
+	default y
+	help
+	  Select this option to enable PKI.
+	  PKI parses input packets and create work.
+
+	  To compile this as a module, choose M here.
+
+config OCTEONTX_DPI
+	tristate "OcteonTX DMA Packet Interface(DPI)"
+	depends on 64BIT && PCI
+	default y
+	help
+	  Select this option to enable DPI.
+	  DPI (DMA packet interface) provides DMA support for MAC.
+	  It transfers data between onchip IO bus and SLI.
+	  SLI interfaces PEM(PCIe) blocks.
+
+	  To compile this as a module, choose M here.
+
+config OCTEONTX_SLI_PF
+	tristate "OcteonTX SLI physical function driver(SLI_PF)"
+	depends on 64BIT && PCI && OCTEONTX_DPI && OCTEONTX_RST
+	default y
+	help
+	  Select this option to enable SLI.
+	  SLI interfaces PEM(PCIe) blocks to the cores and memory.
+          SLI needs to be configured when OcteonTX is connected
+          in EP mode to a host.
+
+	  To compile this as a module, choose M here.
+
+config OCTEONTX
+	tristate "OcteonTX coprocessor maintainer"
+	depends on THUNDER_NIC_BGX && OCTEONTX_FPA_PF && OCTEONTX_SSO_PF
+	depends on OCTEONTX_PKO_PF && OCTEONTX_SSOW_PF && OCTEONTX_PKI
+	depends on OCTEONTX_DPI && OCTEONTX_LBK && OCTEONTX_TIM_PF
+	depends on OCTEONTX_SLI_PF
+	default y
+	help
+	  Select this option to enable Octeon coprocessor management.
+
+	  To compile this as a module, choose M here.
+
 endif # NET_VENDOR_CAVIUM
