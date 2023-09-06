@@ -653,7 +653,8 @@ static inline bool is_rvu_96xx_B0(struct rvu *rvu)
 {
 	struct pci_dev *pdev = rvu->pdev;
 
-	return (pdev->revision == 0x00) || (pdev->revision == 0x01);
+	return ((pdev->revision == 0x00) || (pdev->revision == 0x01)) &&
+		(pdev->subsystem_device == PCI_SUBSYS_DEVID_96XX);
 }
 
 static inline bool is_rvu_95xx_A0(struct rvu *rvu)
@@ -1066,8 +1067,6 @@ void rvu_ree_unregister_interrupts(struct rvu *rvu);
 /* TIM APIs */
 int rvu_tim_init(struct rvu *rvu);
 int rvu_tim_lf_teardown(struct rvu *rvu, u16 pcifunc, int lf, int slot);
-int rvu_lf_lookup_tim_errata(struct rvu *rvu, struct rvu_block *block,
-		u16 pcifunc, int slot);
 
 #ifdef CONFIG_DEBUG_FS
 void rvu_dbg_init(struct rvu *rvu);
@@ -1078,6 +1077,10 @@ static inline void rvu_dbg_exit(struct rvu *rvu) {}
 #endif
 
 int rvu_ndc_fix_locked_cacheline(struct rvu *rvu, int blkaddr);
+
+/* HW workarounds/fixes */
+int rvu_tim_lookup_rsrc(struct rvu *rvu, struct rvu_block *block,
+			u16 pcifunc, int slot);
 
 /* RVU Switch */
 void rvu_switch_enable(struct rvu *rvu);
@@ -1094,5 +1097,4 @@ int rvu_mcs_init(struct rvu *rvu);
 int rvu_mcs_flr_handler(struct rvu *rvu, u16 pcifunc);
 void rvu_mcs_ptp_cfg(struct rvu *rvu, u8 rpm_id, u8 lmac_id, bool ena);
 void rvu_mcs_exit(struct rvu *rvu);
-
 #endif /* RVU_H */
