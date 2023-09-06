@@ -582,7 +582,7 @@ int otx2_cpri_parse_and_init_intf(struct otx2_bphy_cdev_priv *cdev,
 				ether_addr_copy(netdev->dev_addr,
 						priv->mac_addr);
 			else
-				random_ether_addr(netdev->dev_addr);
+				eth_random_addr(netdev->dev_addr);
 			priv->pdev = pci_get_device(OTX2_BPHY_PCI_VENDOR_ID,
 						    OTX2_BPHY_PCI_DEVICE_ID,
 						    NULL);
@@ -600,7 +600,7 @@ int otx2_cpri_parse_and_init_intf(struct otx2_bphy_cdev_priv *cdev,
 			}
 
 			netif_napi_add(priv->netdev, &priv->napi,
-				       otx2_cpri_napi_poll, NAPI_POLL_WEIGHT);
+				       otx2_cpri_napi_poll);
 
 			/* keep last (cpri + lmac) priv structure */
 			if (!priv2)
