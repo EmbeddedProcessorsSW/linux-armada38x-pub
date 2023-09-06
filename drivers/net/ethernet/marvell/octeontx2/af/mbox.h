@@ -1683,6 +1683,8 @@ struct flow_msg {
 		u8 next_header;
 	};
 	__be16 vlan_itci;
+	__be32 gtpu_teid;
+	__be32 gtpc_teid;
 };
 
 struct npc_install_flow_req {

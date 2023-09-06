@@ -210,6 +210,8 @@ enum key_fields {
 	NPC_SPORT_SCTP,
 	NPC_DPORT_SCTP,
 	NPC_FDSA_VAL,
+	NPC_GTPU_TEID,
+	NPC_GTPC_TEID,
 	NPC_HEADER_FIELDS_MAX,
 	NPC_CHAN = NPC_HEADER_FIELDS_MAX, /* Valid when Rx */
 	NPC_PF_FUNC, /* Valid when Tx */
