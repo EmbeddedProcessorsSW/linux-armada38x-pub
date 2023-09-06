@@ -5902,3 +5902,16 @@ bool rvu_nix_is_ptp_tx_enabled(struct rvu *rvu, u16 pcifunc)
 	cfg = rvu_read64(rvu, blkaddr, NIX_AF_LFX_TX_CFG(nixlf));
 	return (cfg & BIT_ULL(32));
 }
+
+int rvu_mbox_handler_nix_rx_sw_sync(struct rvu *rvu, struct msg_req *req,
+				    struct msg_rsp *rsp)
+{
+	int blkaddr;
+
+	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NIX, req->hdr.pcifunc);
+	if (blkaddr < 0)
+		return NIX_AF_ERR_AF_LF_INVALID;
+
+	nix_rx_sync(rvu, blkaddr);
+	return 0;
+}
