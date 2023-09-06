@@ -615,8 +615,6 @@ static inline void rvu_bar2_sel_write64(struct rvu *rvu, u64 block, u64 offset, 
 	 */
 	rvu_write64(rvu, block, offset, val);
 	rvu_read64(rvu, block, offset);
-	/* Barrier to ensure read completes before accessing LF registers */
-	mb();
 }
 
 /* Silicon revisions */
