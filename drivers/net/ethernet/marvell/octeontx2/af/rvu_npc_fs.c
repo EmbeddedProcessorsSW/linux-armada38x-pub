@@ -39,6 +39,7 @@ static const char * const npc_flow_names[] = {
 	[NPC_DPORT_TCP]	= "tcp destination port",
 	[NPC_SPORT_UDP]	= "udp source port",
 	[NPC_DPORT_UDP]	= "udp destination port",
+	[NPC_FDSA_VAL]	= "FDSA tag value ",
 	[NPC_SPORT_SCTP] = "sctp source port",
 	[NPC_DPORT_SCTP] = "sctp destination port",
 	[NPC_LXMB]	= "Mcast/Bcast header ",
@@ -523,6 +524,7 @@ do {									       \
 	NPC_SCAN_HDR(NPC_VLAN_TAG1, NPC_LID_LB, NPC_LT_LB_CTAG, 2, 2);
 	NPC_SCAN_HDR(NPC_VLAN_TAG2, NPC_LID_LB, NPC_LT_LB_STAG_QINQ, 2, 2);
 	NPC_SCAN_HDR(NPC_VLAN_TAG3, NPC_LID_LB, NPC_LT_LB_STAG_QINQ, 6, 2);
+	NPC_SCAN_HDR(NPC_FDSA_VAL, NPC_LID_LB, NPC_LT_LB_FDSA, 1, 1);
 	NPC_SCAN_HDR(NPC_DMAC, NPC_LID_LA, la_ltype, la_start, 6);
 	/* SMAC follows the DMAC(which is 6 bytes) */
 	NPC_SCAN_HDR(NPC_SMAC, NPC_LID_LA, la_ltype, la_start + 6, 6);
@@ -571,9 +573,12 @@ static void npc_set_features(struct rvu *rvu, int blkaddr, u8 intf)
 		*features |= BIT_ULL(NPC_IPPROTO_ESP);
 
 	/* for vlan corresponding layer type should be in the key */
-	if (*features & BIT_ULL(NPC_OUTER_VID))
-		if (!npc_check_field(rvu, blkaddr, NPC_LB, intf))
+	if (*features & BIT_ULL(NPC_OUTER_VID) ||
+	    *features & BIT_ULL(NPC_FDSA_VAL))
+		if (!npc_check_field(rvu, blkaddr, NPC_LB, intf)) {
 			*features &= ~BIT_ULL(NPC_OUTER_VID);
+			*features &= ~BIT_ULL(NPC_FDSA_VAL);
+		}
 
 	/* for vlan ethertypes corresponding layer type should be in the key */
 	if (npc_check_field(rvu, blkaddr, NPC_LB, intf))
@@ -892,6 +897,10 @@ static void npc_update_flow(struct rvu *rvu, struct mcam_entry *entry,
 		npc_update_entry(rvu, NPC_LD, entry, NPC_LT_LD_ICMP6,
 				 0, ~0ULL, 0, intf);
 
+	if (features & BIT_ULL(NPC_FDSA_VAL))
+		npc_update_entry(rvu, NPC_LB, entry, NPC_LT_LB_FDSA,
+				 0, ~0ULL, 0, intf);
+
 	/* For AH, LTYPE should be present in entry */
 	if (features & BIT_ULL(NPC_IPPROTO_AH))
 		npc_update_entry(rvu, NPC_LD, entry, NPC_LT_LD_AH,
@@ -945,6 +954,8 @@ do {									      \
 		       ntohs(mask->vlan_tci), 0);
 	NPC_WRITE_FLOW(NPC_INNER_VID, vlan_itci, ntohs(pkt->vlan_itci), 0,
 		       ntohs(mask->vlan_itci), 0);
+	NPC_WRITE_FLOW(NPC_FDSA_VAL, vlan_tci, ntohs(pkt->vlan_tci), 0,
+		       ntohs(mask->vlan_tci), 0);
 
 	NPC_WRITE_FLOW(NPC_IPFRAG_IPV6, next_header, pkt->next_header, 0,
 		       mask->next_header, 0);
