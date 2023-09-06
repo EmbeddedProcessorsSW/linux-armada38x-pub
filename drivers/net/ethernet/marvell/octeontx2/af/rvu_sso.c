@@ -301,6 +301,9 @@ static void rvu_ssow_clean_prefetch(struct rvu *rvu, u16 pcifunc, int slot)
 	u16 ssow_lf;
 
 	ssow_blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_SSOW, 0);
+	if (ssow_blkaddr == -ENODEV)
+		return;
+
 	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_SSO, 0);
 
 	ssow_lf = rvu_get_lf(rvu, &hw->block[ssow_blkaddr], pcifunc, slot);
