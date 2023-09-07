@@ -19,6 +19,9 @@
  * Returns:
  *	x0 - bytes not copied
  */
+        .macro ins_nops
+        nops 7
+        .endm
 
 	.macro ldrb1 reg, ptr, val
 	user_ldst 9998f, ldtrb, \reg, \ptr, \val
@@ -57,7 +60,17 @@ srcin	.req	x15
 SYM_FUNC_START(__arch_copy_from_user)
 	add	end, x0, x2
 	mov	srcin, x1
+alternative_if_not ARM64_WORKAROUND_MRVL_38500
+	nop
+alternative_else
+	b .Lcopy_with_nops
+alternative_endif
+
 #include "copy_template.S"
+	b .lgetout
+.Lcopy_with_nops:
+#include "copy_template_nops.S"
+.lgetout:
 	mov	x0, #0				// Nothing to copy
 	ret
 

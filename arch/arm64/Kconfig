@@ -1118,6 +1118,18 @@ config MRVL_ERRATUM_35443
 
 	If unsure, say Y.
 
+config MRVL_ERRATUM_38500
+	bool "Marvell erratum 38500"
+	default y
+	help
+	  Enable workaround for erratum 38500. T8x ARM CPU can incorrectly
+	  forward data from an older store to a younger load. When this happens
+	  L1 Dcache parity error occurs in hardware and Synchronous parity error
+	  abort is raised to software. To workaround this erratum, nops are
+	  introduced in between loads and stores.
+
+	  If unsure, say Y.
+
 config QCOM_FALKOR_ERRATUM_1003
 	bool "Falkor E1003: Incorrect translation due to ASID change"
 	default y
