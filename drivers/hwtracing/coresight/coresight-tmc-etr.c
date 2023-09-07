@@ -741,11 +741,37 @@ static void tmc_etr_free_resrv_buf(struct etr_buf *etr_buf)
 	kfree(resrv_buf);
 }
 
+static void tmc_etr_sync_resrv_buf(struct etr_buf *etr_buf, u64 rrp, u64 rwp)
+{
+	/*
+	 * Adjust the buffer to point to the beginning of the trace data
+	 * and update the available trace data.
+	 */
+	etr_buf->offset = rrp - etr_buf->hwaddr;
+	if (etr_buf->full)
+		etr_buf->len = etr_buf->size;
+	else
+		etr_buf->len = rwp - rrp;
+}
+
+static ssize_t tmc_etr_get_data_resrv_buf(struct etr_buf *etr_buf,
+					 u64 offset, size_t len, char **bufpp)
+{
+	struct etr_flat_buf *resrv_buf = etr_buf->private;
+
+	*bufpp = (char *)resrv_buf->vaddr + offset;
+	/*
+	 * tmc_etr_buf_get_data already adjusts the length to handle
+	 * buffer wrapping around.
+	 */
+	return len;
+}
+
 static const struct etr_buf_operations etr_resrv_buf_ops = {
 	.alloc = tmc_etr_alloc_resrv_buf,
 	.free = tmc_etr_free_resrv_buf,
-	.sync = tmc_etr_sync_flat_buf,
-	.get_data = tmc_etr_get_data_flat_buf,
+	.sync = tmc_etr_sync_resrv_buf,
+	.get_data = tmc_etr_get_data_resrv_buf,
 };
 
 /*
