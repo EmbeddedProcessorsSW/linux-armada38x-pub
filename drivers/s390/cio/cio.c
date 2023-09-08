@@ -20,6 +20,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
+#include <linux/isolation.h>
 #include <asm/cio.h>
 #include <asm/delay.h>
 #include <asm/irq.h>
@@ -583,6 +584,8 @@ void cio_tsch(struct subchannel *sch)
 {
 	struct irb *irb;
 	int irq_context;
+
+	task_isolation_kernel_enter();
 
 	irb = this_cpu_ptr(&cio_irb);
 	/* Store interrupt response block to lowcore. */

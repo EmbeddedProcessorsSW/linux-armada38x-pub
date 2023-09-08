@@ -36,6 +36,7 @@
 #include <linux/percpu.h>
 #include <linux/seq_file.h>
 #include <linux/slab.h>
+#include <linux/isolation.h>
 #include <linux/irqchip.h>
 #include <linux/irqchip/chained_irq.h>
 #include <linux/irqchip/arm-gic.h>
@@ -338,6 +339,8 @@ static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
 	u32 irqstat, irqnr;
 	struct gic_chip_data *gic = &gic_data[0];
 	void __iomem *cpu_base = gic_data_cpu_base(gic);
+
+	task_isolation_kernel_enter();
 
 	do {
 		irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
