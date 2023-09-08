@@ -1173,10 +1173,13 @@ int otx2_add_flow(struct otx2_nic *pfvf, struct ethtool_rxnfc *nfc)
 	 *    vf_num:vf_idx+1
 	 */
 	vf_num = ethtool_get_flow_spec_ring_vf(fsp->ring_cookie);
-	if (!is_otx2_vf(pfvf->pcifunc) && !vf_num &&
-	    ring >= pfvf->hw.rx_queues && fsp->ring_cookie != RX_CLS_FLOW_DISC)
+	if (!is_otx2_vf(pfvf->pcifunc) && vf_num)
+		goto bypass_queue_check;
+
+	if (ring >= pfvf->hw.rx_queues && fsp->ring_cookie != RX_CLS_FLOW_DISC)
 		return -EINVAL;
 
+bypass_queue_check:
 	if (fsp->location >= otx2_get_maxflows(flow_cfg))
 		return -EINVAL;
 
