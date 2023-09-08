@@ -3066,6 +3066,10 @@ static void __rvu_flr_handler(struct rvu *rvu, u16 pcifunc)
 	 * 2. Flush and reset SSO/SSOW
 	 * 3. Cleanup pools (NPA)
 	 */
+
+	/* Free allocated BPIDs */
+	rvu_nix_flr_free_bpids(rvu, pcifunc);
+
 	rvu_blklf_teardown(rvu, pcifunc, BLKADDR_NIX0);
 	rvu_blklf_teardown(rvu, pcifunc, BLKADDR_NIX1);
 	rvu_blklf_teardown(rvu, pcifunc, BLKADDR_CPT0);
@@ -3085,9 +3089,6 @@ static void __rvu_flr_handler(struct rvu *rvu, u16 pcifunc)
 	 */
 	rvu_npc_free_mcam_entries(rvu, pcifunc, -1);
 	rvu_mac_reset(rvu, pcifunc);
-
-	/* Free allocated BPIDs */
-	rvu_nix_flr_free_bpids(rvu, pcifunc);
 
 	mutex_unlock(&rvu->flr_lock);
 }
