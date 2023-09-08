@@ -2598,7 +2598,7 @@ static int nix_smq_flush(struct rvu *rvu, int blkaddr,
 	/* restore cgx tx state */
 	if (restore_tx_en)
 		rvu_cgx_config_tx(rvu_cgx_pdata(cgx_id, rvu), lmac_id, false);
-	return 0;
+	return err;
 }
 
 static int nix_txschq_free(struct rvu *rvu, u16 pcifunc)
