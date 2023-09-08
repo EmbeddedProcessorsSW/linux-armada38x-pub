@@ -2593,7 +2593,7 @@ static int nix_smq_flush(struct rvu *rvu, int blkaddr,
 	/* restore cgx tx state */
 	if (restore_tx_en)
 		rvu_cgx_config_tx(rvu_cgx_pdata(cgx_id, rvu), lmac_id, false);
-	return err;
+	return 0;
 }
 
 static int nix_txschq_free(struct rvu *rvu, u16 pcifunc)
@@ -5185,7 +5185,8 @@ int rvu_mbox_handler_nix_lf_stop_rx(struct rvu *rvu, struct msg_req *req,
 	pfvf = rvu_get_pfvf(rvu, pcifunc);
 	clear_bit(NIXLF_INITIALIZED, &pfvf->flags);
 
-	return rvu_cgx_start_stop_io(rvu, pcifunc, false);
+	rvu_cgx_start_stop_io(rvu, pcifunc, false);
+	return rvu_cgx_tx_enable(rvu, pcifunc, true);
 }
 
 #define RX_SA_BASE  GENMASK_ULL(52, 7)
