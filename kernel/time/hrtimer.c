@@ -30,6 +30,7 @@
 #include <linux/syscalls.h>
 #include <linux/interrupt.h>
 #include <linux/tick.h>
+#include <linux/isolation.h>
 #include <linux/err.h>
 #include <linux/debugobjects.h>
 #include <linux/sched/signal.h>
@@ -728,6 +729,19 @@ static inline int hrtimer_is_hres_enabled(void)
 }
 
 static void retrigger_next_event(void *arg);
+
+#ifdef CONFIG_TASK_ISOLATION
+void kick_hrtimer(void)
+{
+	unsigned long flags;
+
+	preempt_disable();
+	local_irq_save(flags);
+	retrigger_next_event(NULL);
+	local_irq_restore(flags);
+	preempt_enable();
+}
+#endif
 
 /*
  * Switch to high resolution mode

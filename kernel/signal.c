@@ -45,6 +45,7 @@
 #include <linux/posix-timers.h>
 #include <linux/cgroup.h>
 #include <linux/audit.h>
+#include <linux/isolation.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/signal.h>
@@ -768,6 +769,7 @@ void signal_wake_up_state(struct task_struct *t, unsigned int state)
 {
 	lockdep_assert_held(&t->sighand->siglock);
 
+	task_isolation_signal(t);
 	set_tsk_thread_flag(t, TIF_SIGPENDING);
 
 	/*

@@ -284,4 +284,10 @@ struct prctl_mm_map {
 #define PR_SET_VMA		0x53564d41
 # define PR_SET_VMA_ANON_NAME		0
 
+/* Enable task_isolation mode for TASK_ISOLATION kernels. */
+#define PR_TASK_ISOLATION		48
+# define PR_TASK_ISOLATION_ENABLE	(1 << 0)
+# define PR_TASK_ISOLATION_SET_SIG(sig)	(((sig) & 0x7f) << 8)
+# define PR_TASK_ISOLATION_GET_SIG(bits) (((bits) >> 8) & 0x7f)
+
 #endif /* _LINUX_PRCTL_H */

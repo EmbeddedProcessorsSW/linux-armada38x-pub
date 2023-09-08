@@ -1489,6 +1489,10 @@ struct task_struct {
 	unsigned long			lowest_stack;
 	unsigned long			prev_lowest_stack;
 #endif
+#ifdef CONFIG_TASK_ISOLATION
+	unsigned short			task_isolation_flags; /* prctl */
+	unsigned short			task_isolation_state;
+#endif
 
 #ifdef CONFIG_X86_MCE
 	void __user			*mce_vaddr;

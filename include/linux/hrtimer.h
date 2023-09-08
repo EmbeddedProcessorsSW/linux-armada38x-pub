@@ -529,6 +529,10 @@ extern void __init hrtimers_init(void);
 /* Show pending timers: */
 extern void sysrq_timer_list_show(void);
 
+#ifdef CONFIG_TASK_ISOLATION
+extern void kick_hrtimer(void);
+#endif
+
 int hrtimers_prepare_cpu(unsigned int cpu);
 #ifdef CONFIG_HOTPLUG_CPU
 int hrtimers_dead_cpu(unsigned int cpu);

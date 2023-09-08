@@ -1060,6 +1060,24 @@ static bool report_idle_softirq(void)
 	return true;
 }
 
+#ifdef CONFIG_TASK_ISOLATION
+int try_stop_full_tick(void)
+{
+	int cpu = smp_processor_id();
+	struct tick_sched *ts = this_cpu_ptr(&tick_cpu_sched);
+
+	/* For an unstable clock, we should return a permanent error code. */
+	if (atomic_read(&tick_dep_mask) & TICK_DEP_MASK_CLOCK_UNSTABLE)
+		return -EINVAL;
+
+	if (!can_stop_full_tick(cpu, ts))
+		return -EAGAIN;
+
+	tick_nohz_stop_sched_tick(ts, cpu);
+	return 0;
+}
+#endif
+
 static bool can_stop_idle_tick(int cpu, struct tick_sched *ts)
 {
 	/*

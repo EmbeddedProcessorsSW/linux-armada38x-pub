@@ -284,6 +284,26 @@ static ssize_t print_cpus_isolated(struct device *dev,
 }
 static DEVICE_ATTR(isolated, 0444, print_cpus_isolated, NULL);
 
+#ifdef CONFIG_TASK_ISOLATION
+static ssize_t isolation_running_show(struct device *dev,
+				      struct device_attribute *attr, char *buf)
+{
+	int n;
+	cpumask_var_t isolation_running;
+
+	if (!zalloc_cpumask_var(&isolation_running, GFP_KERNEL))
+		return -ENOMEM;
+
+	task_isolation_cpumask(isolation_running);
+	n = sprintf(buf, "%*pbl\n", cpumask_pr_args(isolation_running));
+
+	free_cpumask_var(isolation_running);
+
+	return n;
+}
+static DEVICE_ATTR_RO(isolation_running);
+#endif
+
 #ifdef CONFIG_NO_HZ_FULL
 static ssize_t print_cpus_nohz_full(struct device *dev,
 				    struct device_attribute *attr, char *buf)
@@ -468,6 +488,9 @@ static struct attribute *cpu_root_attrs[] = {
 	&dev_attr_isolated.attr,
 #ifdef CONFIG_NO_HZ_FULL
 	&dev_attr_nohz_full.attr,
+#endif
+#ifdef CONFIG_TASK_ISOLATION
+	&dev_attr_isolation_running.attr,
 #endif
 #ifdef CONFIG_GENERIC_CPU_AUTOPROBE
 	&dev_attr_modalias.attr,

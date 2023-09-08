@@ -6142,6 +6142,12 @@
 			neutralize any effect of /proc/sys/kernel/sysrq.
 			Useful for debugging.
 
+	task_isolation_debug	[KNL]
+			In kernels built with CONFIG_TASK_ISOLATION, this
+			setting will generate console backtraces to
+			accompany the diagnostics generated about
+			interrupting tasks running with task isolation.
+
 	tcpmhash_entries= [KNL,NET]
 			Set the number of tcp_metrics_hash slots.
 			Default value is 8192 or 16384 depending on total

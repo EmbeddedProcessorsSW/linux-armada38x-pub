@@ -681,6 +681,34 @@ config CPU_ISOLATION
 
 source "kernel/rcu/Kconfig"
 
+config HAVE_ARCH_TASK_ISOLATION
+	bool
+
+config TASK_ISOLATION
+	bool "Provide hard CPU isolation from the kernel on demand"
+	depends on NO_HZ_FULL && HAVE_ARCH_TASK_ISOLATION
+	help
+
+	Allow userspace processes that place themselves on cores with
+	nohz_full and isolcpus enabled, and run prctl(PR_TASK_ISOLATION),
+	to "isolate" themselves from the kernel.  Prior to returning to
+	userspace, isolated tasks will arrange that no future kernel
+	activity will interrupt the task while the task is running in
+	userspace.  Attempting to re-enter the kernel while in this mode
+	will cause the task to be terminated with a signal; you must
+	explicitly use prctl() to disable task isolation before resuming
+	normal use of the kernel.
+
+	This "hard" isolation from the kernel is required for userspace
+	tasks that are running hard real-time tasks in userspace, such as
+	a high-speed network driver in userspace.  Without this option, but
+	with NO_HZ_FULL enabled, the kernel will make a best-faith, "soft"
+	effort to shield a single userspace process from interrupts, but
+	makes no guarantees.
+
+	You should say "N" unless you are intending to run a
+	high-performance userspace driver or similar task.
+
 config BUILD_BIN2C
 	bool
 	default n
