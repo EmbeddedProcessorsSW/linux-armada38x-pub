@@ -37,6 +37,7 @@
 #include <linux/kcsan.h>
 #include <linux/rv.h>
 #include <asm/kmap_size.h>
+#include <linux/isolation.h>
 
 /* task_struct member predeclarations (sorted alphabetically): */
 struct audit_context;
@@ -1999,6 +2000,7 @@ extern char *__get_task_comm(char *to, size_t len, struct task_struct *tsk);
 #ifdef CONFIG_SMP
 static __always_inline void scheduler_ipi(void)
 {
+	task_isolation_kernel_enter();
 	/*
 	 * Fold TIF_NEED_RESCHED into the preempt_count; anybody setting
 	 * TIF_NEED_RESCHED remotely (for the first time) will also send

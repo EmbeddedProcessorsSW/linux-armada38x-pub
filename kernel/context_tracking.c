@@ -24,7 +24,7 @@
 #include <linux/export.h>
 #include <linux/kprobes.h>
 #include <trace/events/rcu.h>
-
+#include <linux/isolation.h>
 
 DEFINE_PER_CPU(struct context_tracking, context_tracking) = {
 #ifdef CONFIG_CONTEXT_TRACKING_IDLE
@@ -610,6 +610,8 @@ void noinstr __ct_user_exit(enum ctx_state state)
 	if (!context_tracking_recursion_enter())
 		return;
 
+	task_isolation_kernel_enter();
+
 	if (__ct_state() == state) {
 		if (ct->active) {
 			/*
@@ -622,6 +624,7 @@ void noinstr __ct_user_exit(enum ctx_state state)
 				vtime_user_exit(current);
 				trace_user_exit(0);
 				instrumentation_end();
+				task_isolation_user_exit();
 			}
 
 			/*

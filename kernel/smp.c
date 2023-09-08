@@ -25,6 +25,7 @@
 #include <linux/nmi.h>
 #include <linux/sched/debug.h>
 #include <linux/jump_label.h>
+#include <linux/isolation.h>
 
 #include "smpboot.h"
 #include "sched/smp.h"
@@ -505,8 +506,10 @@ void __smp_call_single_queue(int cpu, struct llist_node *node)
 	 * locking and barrier primitives. Generic code isn't really
 	 * equipped to do the right thing...
 	 */
-	if (llist_add(node, &per_cpu(call_single_queue, cpu)))
+	if (llist_add(node, &per_cpu(call_single_queue, cpu))) {
+		task_isolation_remote(cpu, "IPI function");
 		send_call_function_single_ipi(cpu);
+	}
 }
 
 /*
@@ -976,8 +979,10 @@ static void smp_call_function_many_cond(const struct cpumask *mask,
 		 */
 		if (nr_cpus == 1)
 			send_call_function_single_ipi(last_cpu);
-		else if (likely(nr_cpus > 1))
+		else if (likely(nr_cpus > 1)) {
+			task_isolation_remote_cpumask(cfd->cpumask_ipi, "IPI function");
 			arch_send_call_function_ipi_mask(cfd->cpumask_ipi);
+		}
 
 		cfd_seq_store(this_cpu_ptr(&cfd_seq_local)->pinged, this_cpu, CFD_SEQ_NOCPU, CFD_SEQ_PINGED);
 	}

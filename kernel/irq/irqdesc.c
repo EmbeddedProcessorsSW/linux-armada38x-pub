@@ -16,6 +16,7 @@
 #include <linux/bitmap.h>
 #include <linux/irqdomain.h>
 #include <linux/sysfs.h>
+#include <linux/isolation.h>
 
 #include "internals.h"
 
@@ -648,6 +649,11 @@ int handle_irq_desc(struct irq_desc *desc)
 	if (WARN_ON_ONCE(!in_hardirq() && handle_enforce_irqctx(data)))
 		return -EPERM;
 
+	task_isolation_interrupt((data->irq == data->hwirq) ?
+				 "irq %d (%s)" : "irq %d (%s hwirq %d)",
+				 data->irq, data->domain ? data->domain->name :
+				 "", data->hwirq);
+
 	generic_handle_irq_desc(desc);
 	return 0;
 }
@@ -746,6 +752,7 @@ EXPORT_SYMBOL_GPL(generic_handle_domain_irq_safe);
 int generic_handle_domain_nmi(struct irq_domain *domain, unsigned int hwirq)
 {
 	WARN_ON_ONCE(!in_nmi());
+	task_isolation_interrupt("Task isolation broken because of NMI\n");
 	return handle_irq_desc(irq_resolve_mapping(domain, hwirq));
 }
 #endif

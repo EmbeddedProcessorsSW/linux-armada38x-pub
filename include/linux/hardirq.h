@@ -8,6 +8,7 @@
 #include <linux/ftrace_irq.h>
 #include <linux/sched.h>
 #include <linux/vtime.h>
+#include <linux/isolation.h>
 #include <asm/hardirq.h>
 
 extern void synchronize_irq(unsigned int irq);
@@ -108,6 +109,7 @@ void irq_exit_rcu(void);
 	do {							\
 		lockdep_off();					\
 		arch_nmi_enter();				\
+		task_isolation_kernel_enter();			\
 		BUG_ON(in_nmi() == NMI_MASK);			\
 		__preempt_count_add(NMI_OFFSET + HARDIRQ_OFFSET);	\
 	} while (0)
