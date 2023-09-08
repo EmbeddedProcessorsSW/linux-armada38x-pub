@@ -14,6 +14,12 @@
 #include <linux/of_device.h>
 #include <linux/perf_event.h>
 
+#define MPAM_ASSOC_PC                   0x1000
+#define MPAM_TABLE_SIZE                 256
+#define MPAM_COUNTER_OFFSET_START       1
+#define MPAM_COUNTER_MAX                8
+#define MPAM_CNTR_SHIFT                 5
+
 /*
  * Each of these events maps to a free running 64 bit counter
  * with no event control, but can be reset.
@@ -50,6 +56,21 @@ enum pem_events {
 	PEM_EVENTIDS_MAX,
 };
 
+#define PEM_MPAM_SUPPORT_LIST                           \
+			((1 << IB_TLP_CPL)      |       \
+			(1 << IB_TLP_DWORDS_CPL)|	\
+			(1 << OB_TLP_NPR)       |       \
+			(1 << OB_TLP_PR)        |       \
+			(1 << OB_TLP_CPL)       |       \
+			(1 << OB_TLP_DWORDS_NPR)|	\
+			(1 << OB_TLP_DWORDS_PR) |       \
+			(1 << OB_TLP_DWORDS_CPL)|	\
+			(1 << OB_INFLIGHT)      |       \
+			(1 << OB_READS)         |       \
+			(1 << OB_MERGES_NPR)    |       \
+			(1 << OB_MERGES_PR)     |       \
+			(1 << OB_MERGES_CPL))
+
 static u64 eventid_to_offset_table[] = {
 	[IB_TLP_NPR]	     = 0x0,
 	[IB_TLP_PR]	     = 0x8,
@@ -85,6 +106,10 @@ struct pem_pmu {
 	void __iomem *base;
 	unsigned int cpu;
 	struct	device *dev;
+	/* Bitmap of active counters common for all events */
+	DECLARE_BITMAP(mpam_active_counters, MPAM_COUNTER_MAX);
+	/* Refcount of mpam counters common for all events */
+	refcount_t mpam_counter_ref[MPAM_COUNTER_MAX];
 	struct hlist_node node;
 };
 
@@ -149,9 +174,11 @@ static struct attribute_group pem_perf_events_attr_group = {
 };
 
 PMU_FORMAT_ATTR(event, "config:0-5");
+PMU_FORMAT_ATTR(partid, "config1:0-15");
 
 static struct attribute *pem_perf_format_attrs[] = {
 	&format_attr_event.attr,
+	&format_attr_partid.attr,
 	NULL
 };
 
@@ -219,16 +246,120 @@ static int pem_perf_event_init(struct perf_event *event)
 	return 0;
 }
 
+/*
+ * Create a default MPAM partid to counter mapping
+ * Table offset => partid
+ * Table entry => counter index(eight counters)
+ *
+ * PEM Hardware supports many(partid) to one counter mapping,
+ * but we are restricting to one partid to one counter mapping
+ * except for counter 0 for the sake of simplicity.
+ * ie. Map counter 0 as the default target for all partitions.
+ *
+ * Counter alloc:
+ * When perf selects a partition for filtering, we allocate a
+ * free counter and program the table as, table[partid] => counter X.
+ * Here X ranges from 1 to 7
+ *
+ * Counter free:
+ * table[partid] => counter 0.
+ *
+ * MPAM partid to counter mapping table being common for all events,
+ * we keep a refcount to track that.
+ * Hence a counter is allocated/freed only by the first/last user.
+ *
+ * Having this default target helps us to have the table programming to
+ * be done only for the selected partition and not for the entire table
+ * while starting a perf event.
+ */
+static void pem_mpam_table_init(struct pem_pmu *pmu)
+{
+	int i;
+
+	for (i = 0; i < MPAM_TABLE_SIZE; i++)
+		writeq(0x0, pmu->base + MPAM_ASSOC_PC + (i << 3));
+}
+
+static inline int pem_partid_to_counter(struct pem_pmu *pmu, int partid)
+{
+	return readq(pmu->base + MPAM_ASSOC_PC + (partid << 3));
+}
+
+static int pem_mpam_counter_alloc(struct pem_pmu *pmu, int eventid, int partid)
+{
+	int cntr;
+
+	if (!((1ULL << eventid) & PEM_MPAM_SUPPORT_LIST)) {
+		dev_info(pmu->dev, "MPAM filtering not supported for this event\n");
+		return 0;
+	}
+
+	cntr = pem_partid_to_counter(pmu, partid);
+	/* If there is an existing mapping, just add a reference */
+	if (cntr) {
+		refcount_inc(&pmu->mpam_counter_ref[cntr]);
+	} else {
+		/* Create a new mapping */
+		cntr = find_next_zero_bit(pmu->mpam_active_counters,
+					  MPAM_COUNTER_MAX,
+					  MPAM_COUNTER_OFFSET_START);
+		if (cntr >= MPAM_COUNTER_MAX)
+			return -ENOSPC;
+
+		/* a. Update the counter bitmap */
+		set_bit(cntr, pmu->mpam_active_counters);
+		/* b. Update the hardware mapping table */
+		writeq(cntr, pmu->base + MPAM_ASSOC_PC + (partid << 3));
+
+		refcount_set(&pmu->mpam_counter_ref[cntr], 1);
+	}
+
+	return 0;
+}
+
+static void pem_mpam_counter_free(struct pem_pmu *pmu, int eventid, int partid)
+{
+	int cntr;
+
+	if (!((1ULL << eventid) & PEM_MPAM_SUPPORT_LIST))
+		return;
+
+	cntr = pem_partid_to_counter(pmu, partid);
+	/* Release counter mapping */
+	if (refcount_dec_and_test(&pmu->mpam_counter_ref[cntr])) {
+		/* a. Update the counter bitmap */
+		clear_bit(cntr, pmu->mpam_active_counters);
+		/* Update the hardware mapping table */
+		writeq(0, pmu->base + MPAM_ASSOC_PC + (partid << 3));
+	}
+}
+
 static void pem_perf_counter_reset(struct pem_pmu *pmu,
 				   struct perf_event *event, int eventid)
 {
-	writeq_relaxed(0x0, pmu->base + eventid_to_offset(eventid));
+	int cntr;
+
+	if (!((1ULL << eventid) & PEM_MPAM_SUPPORT_LIST))
+		cntr = 0;
+	else
+		cntr = pem_partid_to_counter(pmu, event->attr.config1);
+
+	writeq_relaxed(0x0, pmu->base + eventid_to_offset(eventid) +
+		       (cntr << MPAM_CNTR_SHIFT));
 }
 
 static u64 pem_perf_read_counter(struct pem_pmu *pmu,
 				 struct perf_event *event, int eventid)
 {
-	return readq_relaxed(pmu->base + eventid_to_offset(eventid));
+	int cntr;
+
+	if (!((1ULL << eventid) & PEM_MPAM_SUPPORT_LIST))
+		cntr = 0;
+	else
+		cntr = pem_partid_to_counter(pmu, event->attr.config1);
+
+	return readq_relaxed(pmu->base + eventid_to_offset(eventid) +
+			     (cntr << MPAM_CNTR_SHIFT));
 }
 
 static void pem_perf_event_update(struct perf_event *event)
@@ -260,11 +391,16 @@ static void pem_perf_event_start(struct perf_event *event, int flags)
 
 static int pem_perf_event_add(struct perf_event *event, int flags)
 {
+	struct pem_pmu *pmu = to_pem_pmu(event->pmu);
 	struct hw_perf_event *hwc = &event->hw;
+	int err;
 
 	hwc->idx = event->attr.config;
 	if (hwc->idx >= PEM_EVENTIDS_MAX)
 		return -EINVAL;
+	err = pem_mpam_counter_alloc(pmu, hwc->idx, event->attr.config1);
+	if (err)
+		return err;
 	hwc->state |= PERF_HES_STOPPED;
 
 	if (flags & PERF_EF_START)
@@ -285,9 +421,11 @@ static void pem_perf_event_stop(struct perf_event *event, int flags)
 
 static void pem_perf_event_del(struct perf_event *event, int flags)
 {
+	struct pem_pmu *pmu = to_pem_pmu(event->pmu);
 	struct hw_perf_event *hwc = &event->hw;
 
 	pem_perf_event_stop(event, PERF_EF_UPDATE);
+	pem_mpam_counter_free(pmu, hwc->idx, event->attr.config1);
 	hwc->idx = -1;
 }
 
@@ -345,6 +483,11 @@ static int pem_perf_probe(struct platform_device *pdev)
 
 	/* Choose this cpu to collect perf data */
 	pem_pmu->cpu = raw_smp_processor_id();
+
+	/* Map counter 0 as always active */
+	set_bit(0, pem_pmu->mpam_active_counters);
+
+	pem_mpam_table_init(pem_pmu);
 
 	name = devm_kasprintf(pem_pmu->dev, GFP_KERNEL, "mrvl_pcie_rc_pmu_%llx",
 			      res->start);
