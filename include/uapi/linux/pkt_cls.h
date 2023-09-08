@@ -594,6 +594,13 @@ enum {
 
 	TCA_FLOWER_KEY_L2TPV3_SID,	/* be32 */
 
+	TCA_FLOWER_L2_MISS,		/* u8 */
+
+	TCA_FLOWER_KEY_CFM,		/* nested */
+
+	TCA_FLOWER_KEY_SPI,		/* be32 */
+	TCA_FLOWER_KEY_SPI_MASK,	/* be32 */
+
 	__TCA_FLOWER_MAX,
 };
 
