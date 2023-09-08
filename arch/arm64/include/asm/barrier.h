@@ -30,6 +30,8 @@
 #define __tsb_csync()	asm volatile("hint #18" : : : "memory")
 #define csdb()		asm volatile("hint #20" : : : "memory")
 
+#define instr_sync()	isb()
+
 /*
  * Data Gathering Hint:
  * This instruction prevents merging memory accesses with Normal-NC or

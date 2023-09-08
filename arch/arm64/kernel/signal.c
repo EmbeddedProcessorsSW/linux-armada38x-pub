@@ -19,6 +19,7 @@
 #include <linux/resume_user_mode.h>
 #include <linux/ratelimit.h>
 #include <linux/syscalls.h>
+#include <linux/isolation.h>
 
 #include <asm/daifflags.h>
 #include <asm/debug-monitors.h>
@@ -1105,8 +1106,14 @@ static void do_signal(struct pt_regs *regs)
 	restore_saved_sigmask();
 }
 
+#define NOTIFY_RESUME_LOOP_FLAGS \
+	(_TIF_NEED_RESCHED | _TIF_SIGPENDING | \
+	_TIF_NOTIFY_RESUME | _TIF_FOREIGN_FPSTATE | \
+	_TIF_UPROBE)
+
 void do_notify_resume(struct pt_regs *regs, unsigned long thread_flags)
 {
+	task_isolation_check_run_cleanup();
 	do {
 		if (thread_flags & _TIF_NEED_RESCHED) {
 			/* Unmask Debug and SError for the next task */
@@ -1137,7 +1144,10 @@ void do_notify_resume(struct pt_regs *regs, unsigned long thread_flags)
 
 		local_daif_mask();
 		thread_flags = read_thread_flags();
-	} while (thread_flags & _TIF_WORK_MASK);
+	} while (thread_flags & NOTIFY_RESUME_LOOP_FLAGS);
+
+	if (thread_flags & _TIF_TASK_ISOLATION)
+		task_isolation_start();
 }
 
 unsigned long __ro_after_init signal_minsigstksz;

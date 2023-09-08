@@ -25,6 +25,7 @@
 #include <linux/perf_event.h>
 #include <linux/preempt.h>
 #include <linux/hugetlb.h>
+#include <linux/isolation.h>
 
 #include <asm/acpi.h>
 #include <asm/bug.h>
@@ -800,7 +801,9 @@ void do_mem_abort(unsigned long far, unsigned long esr, struct pt_regs *regs)
 	const struct fault_info *inf = esr_to_fault_info(esr);
 	unsigned long addr = untagged_addr(far);
 
-	if (!inf->fn(far, esr, regs))
+	task_isolation_kernel_enter();
+
+	if (!inf->fn(addr, esr, regs))
 		return;
 
 	if (!user_mode(regs))
@@ -817,6 +820,7 @@ NOKPROBE_SYMBOL(do_mem_abort);
 
 void do_sp_pc_abort(unsigned long addr, unsigned long esr, struct pt_regs *regs)
 {
+	task_isolation_kernel_enter();
 	arm64_notify_die("SP/PC alignment exception", regs, SIGBUS, BUS_ADRALN,
 			 addr, esr);
 }
@@ -880,6 +884,8 @@ void do_debug_exception(unsigned long addr_if_watchpoint, unsigned long esr,
 {
 	const struct fault_info *inf = esr_to_debug_fault_info(esr);
 	unsigned long pc = instruction_pointer(regs);
+
+	task_isolation_kernel_enter();
 
 	debug_exception_enter(regs);
 

@@ -28,6 +28,7 @@
 #include <linux/hw_breakpoint.h>
 #include <linux/regset.h>
 #include <linux/elf.h>
+#include <linux/isolation.h>
 
 #include <asm/compat.h>
 #include <asm/cpufeature.h>
@@ -2134,12 +2135,25 @@ static void report_syscall(struct pt_regs *regs, enum ptrace_syscall_dir dir)
 
 int syscall_trace_enter(struct pt_regs *regs)
 {
-	unsigned long flags = read_thread_flags();
+	unsigned long flags;
+
+	task_isolation_kernel_enter();
+
+	flags = read_thread_flags();
 
 	if (flags & (_TIF_SYSCALL_EMU | _TIF_SYSCALL_TRACE)) {
 		report_syscall(regs, PTRACE_SYSCALL_ENTER);
 		if (flags & _TIF_SYSCALL_EMU)
 			return NO_SYSCALL;
+	}
+
+	/*
+	 * In task isolation mode, we may prevent the syscall from
+	 * running, and if so we also deliver a signal to the process.
+	 */
+	if (test_thread_flag(TIF_TASK_ISOLATION)) {
+		if (task_isolation_syscall(regs->syscallno) == -1)
+			return -1;
 	}
 
 	/* Do the secure computing after ptrace; failures should be fast. */

@@ -9,6 +9,7 @@
 #include <linux/sched/task_stack.h>
 #include <linux/scs.h>
 #include <linux/uaccess.h>
+#include <linux/isolation.h>
 
 #include <asm/alternative.h>
 #include <asm/exception.h>
@@ -229,6 +230,7 @@ unsigned long __kprobes do_sdei_event(struct pt_regs *regs,
 	}
 
 	err = sdei_event_handler(regs, arg);
+	task_isolation_interrupt("SDEI handled");
 	if (err)
 		return SDEI_EV_FAILED;
 
