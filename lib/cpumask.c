@@ -6,6 +6,7 @@
 #include <linux/export.h>
 #include <linux/memblock.h>
 #include <linux/numa.h>
+#include <linux/sched/isolation.h>
 
 /**
  * cpumask_next_wrap - helper to implement for_each_cpu_wrap
@@ -122,25 +123,29 @@ void __init free_bootmem_cpumask_var(cpumask_var_t mask)
  */
 unsigned int cpumask_local_spread(unsigned int i, int node)
 {
-	unsigned int cpu;
+	int cpu, hk_flags;
+	const struct cpumask *mask;
+
+	hk_flags = HK_TYPE_DOMAIN;
+	mask = housekeeping_cpumask(hk_flags);
 
 	/* Wrap: we always want a cpu. */
-	i %= num_online_cpus();
+	i %= cpumask_weight(mask);
 
 	if (node == NUMA_NO_NODE) {
-		cpu = cpumask_nth(i, cpu_online_mask);
+		cpu = cpumask_nth(i, mask);
 		if (cpu < nr_cpu_ids)
 			return cpu;
 	} else {
 		/* NUMA first. */
-		cpu = cpumask_nth_and(i, cpu_online_mask, cpumask_of_node(node));
+		cpu = cpumask_nth_and(i, mask, cpumask_of_node(node));
 		if (cpu < nr_cpu_ids)
 			return cpu;
 
-		i -= cpumask_weight_and(cpu_online_mask, cpumask_of_node(node));
+		i -= cpumask_weight_and(mask, cpumask_of_node(node));
 
 		/* Skip NUMA nodes, done above. */
-		cpu = cpumask_nth_andnot(i, cpu_online_mask, cpumask_of_node(node));
+		cpu = cpumask_nth_andnot(i, mask, cpumask_of_node(node));
 		if (cpu < nr_cpu_ids)
 			return cpu;
 	}
