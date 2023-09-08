@@ -369,6 +369,9 @@ M(NIX_READ_INLINE_IPSEC_CFG, 0x8023, nix_read_inline_ipsec_cfg,		\
 M(NIX_LF_INLINE_RQ_CFG, 0x8024, nix_lf_inline_rq_cfg,		\
 				nix_rq_cpt_field_mask_cfg_req,  \
 				msg_rsp)	\
+M(NIX_ALLOC_BPIDS,	0x8028,	nix_alloc_bpids, nix_alloc_bpid_req, nix_bpids)	\
+M(NIX_FREE_BPIDS,	0x8029, nix_free_bpids, nix_bpids, msg_rsp)		\
+M(NIX_RX_CHAN_CFG,	0x802a, nix_rx_chan_cfg, nix_rx_chan_cfg, nix_rx_chan_cfg)	\
 /* MCS mbox IDs (range 0xA000 - 0xBFFF) */					\
 M(MCS_ALLOC_RESOURCES,	0xa000, mcs_alloc_resources, mcs_alloc_rsrc_req,	\
 				mcs_alloc_rsrc_rsp)				\
@@ -1315,6 +1318,29 @@ struct nix_bp_cfg_rsp {
 	struct mbox_msghdr hdr;
 	u16	chan_bpid[NIX_MAX_BPID_CHAN]; /* Channel and bpid mapping */
 	u8	chan_cnt; /* Number of channel for which bpids are assigned */
+};
+
+struct nix_alloc_bpid_req {
+	struct mbox_msghdr hdr;
+	u8 bpid_cnt;
+	u8 type;
+	u64 rsvd;
+};
+
+struct nix_bpids {
+	struct mbox_msghdr hdr;
+	u8 bpid_cnt;
+	u16 bpids[8];
+	u64 rsvd;
+};
+
+struct nix_rx_chan_cfg {
+	struct mbox_msghdr hdr;
+	u8 type;	/* Interface type(CGX/CPT/LBK) */
+	u8 read;
+	u16 chan;	/* RX channel to be configured */
+	u64 val;	/* NIX_AF_RX_CHAN_CFG value */
+	u64 rsvd;
 };
 
 /* Global NIX inline IPSec configuration */
