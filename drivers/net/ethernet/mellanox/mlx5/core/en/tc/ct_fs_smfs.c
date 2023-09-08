@@ -221,16 +221,16 @@ mlx5_ct_fs_smfs_destroy(struct mlx5_ct_fs *fs)
 }
 
 static inline bool
-mlx5_tc_ct_valid_used_dissector_keys(const u32 used_keys)
+mlx5_tc_ct_valid_used_dissector_keys(const u64 used_keys)
 {
-#define DISS_BIT(name) BIT(FLOW_DISSECTOR_KEY_ ## name)
-	const u32 basic_keys = DISS_BIT(BASIC) | DISS_BIT(CONTROL) | DISS_BIT(META);
-	const u32 ipv4_tcp = basic_keys | DISS_BIT(IPV4_ADDRS) | DISS_BIT(PORTS) | DISS_BIT(TCP);
-	const u32 ipv6_tcp = basic_keys | DISS_BIT(IPV6_ADDRS) | DISS_BIT(PORTS) | DISS_BIT(TCP);
-	const u32 ipv4_udp = basic_keys | DISS_BIT(IPV4_ADDRS) | DISS_BIT(PORTS);
-	const u32 ipv6_udp = basic_keys | DISS_BIT(IPV6_ADDRS) | DISS_BIT(PORTS);
-	const u32 ipv4_gre = basic_keys | DISS_BIT(IPV4_ADDRS);
-	const u32 ipv6_gre = basic_keys | DISS_BIT(IPV6_ADDRS);
+#define DISS_BIT_ULL(name) BIT_ULL(FLOW_DISSECTOR_KEY_ ## name)
+	const u64 basic_keys = DISS_BIT(BASIC) | DISS_BIT(CONTROL) | DISS_BIT(META);
+	const u64 ipv4_tcp = basic_keys | DISS_BIT(IPV4_ADDRS) | DISS_BIT(PORTS) | DISS_BIT(TCP);
+	const u64 ipv6_tcp = basic_keys | DISS_BIT(IPV6_ADDRS) | DISS_BIT(PORTS) | DISS_BIT(TCP);
+	const u64 ipv4_udp = basic_keys | DISS_BIT(IPV4_ADDRS) | DISS_BIT(PORTS);
+	const u64 ipv6_udp = basic_keys | DISS_BIT(IPV6_ADDRS) | DISS_BIT(PORTS);
+	const u64 ipv4_gre = basic_keys | DISS_BIT(IPV4_ADDRS);
+	const u64 ipv6_gre = basic_keys | DISS_BIT(IPV6_ADDRS);
 
 	return (used_keys == ipv4_tcp || used_keys == ipv4_udp || used_keys == ipv6_tcp ||
 		used_keys == ipv6_udp || used_keys == ipv4_gre || used_keys == ipv6_gre);

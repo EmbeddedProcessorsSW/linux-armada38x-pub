@@ -3159,7 +3159,7 @@ ethtool_rx_flow_rule_create(const struct ethtool_rx_flow_spec_input *input)
 		if (v4_m_spec->ip4src ||
 		    v4_m_spec->ip4dst) {
 			match->dissector.used_keys |=
-				BIT(FLOW_DISSECTOR_KEY_IPV4_ADDRS);
+				BIT_ULL(FLOW_DISSECTOR_KEY_IPV4_ADDRS);
 			match->dissector.offset[FLOW_DISSECTOR_KEY_IPV4_ADDRS] =
 				offsetof(struct ethtool_rx_flow_key, ipv4);
 		}
@@ -3174,7 +3174,7 @@ ethtool_rx_flow_rule_create(const struct ethtool_rx_flow_spec_input *input)
 		if (v4_m_spec->psrc ||
 		    v4_m_spec->pdst) {
 			match->dissector.used_keys |=
-				BIT(FLOW_DISSECTOR_KEY_PORTS);
+				BIT_ULL(FLOW_DISSECTOR_KEY_PORTS);
 			match->dissector.offset[FLOW_DISSECTOR_KEY_PORTS] =
 				offsetof(struct ethtool_rx_flow_key, tp);
 		}
@@ -3182,7 +3182,7 @@ ethtool_rx_flow_rule_create(const struct ethtool_rx_flow_spec_input *input)
 			match->key.ip.tos = v4_spec->tos;
 			match->mask.ip.tos = v4_m_spec->tos;
 			match->dissector.used_keys |=
-				BIT(FLOW_DISSECTOR_KEY_IP);
+				BIT_ULL(FLOW_DISSECTOR_KEY_IP);
 			match->dissector.offset[FLOW_DISSECTOR_KEY_IP] =
 				offsetof(struct ethtool_rx_flow_key, ip);
 		}
@@ -3211,7 +3211,7 @@ ethtool_rx_flow_rule_create(const struct ethtool_rx_flow_spec_input *input)
 		if (!ipv6_addr_any((struct in6_addr *)v6_m_spec->ip6src) ||
 		    !ipv6_addr_any((struct in6_addr *)v6_m_spec->ip6dst)) {
 			match->dissector.used_keys |=
-				BIT(FLOW_DISSECTOR_KEY_IPV6_ADDRS);
+				BIT_ULL(FLOW_DISSECTOR_KEY_IPV6_ADDRS);
 			match->dissector.offset[FLOW_DISSECTOR_KEY_IPV6_ADDRS] =
 				offsetof(struct ethtool_rx_flow_key, ipv6);
 		}
@@ -3226,7 +3226,7 @@ ethtool_rx_flow_rule_create(const struct ethtool_rx_flow_spec_input *input)
 		if (v6_m_spec->psrc ||
 		    v6_m_spec->pdst) {
 			match->dissector.used_keys |=
-				BIT(FLOW_DISSECTOR_KEY_PORTS);
+				BIT_ULL(FLOW_DISSECTOR_KEY_PORTS);
 			match->dissector.offset[FLOW_DISSECTOR_KEY_PORTS] =
 				offsetof(struct ethtool_rx_flow_key, tp);
 		}
@@ -3234,7 +3234,7 @@ ethtool_rx_flow_rule_create(const struct ethtool_rx_flow_spec_input *input)
 			match->key.ip.tos = v6_spec->tclass;
 			match->mask.ip.tos = v6_m_spec->tclass;
 			match->dissector.used_keys |=
-				BIT(FLOW_DISSECTOR_KEY_IP);
+				BIT_ULL(FLOW_DISSECTOR_KEY_IP);
 			match->dissector.offset[FLOW_DISSECTOR_KEY_IP] =
 				offsetof(struct ethtool_rx_flow_key, ip);
 		}
@@ -3258,7 +3258,7 @@ ethtool_rx_flow_rule_create(const struct ethtool_rx_flow_spec_input *input)
 		break;
 	}
 
-	match->dissector.used_keys |= BIT(FLOW_DISSECTOR_KEY_BASIC);
+	match->dissector.used_keys |= BIT_ULL(FLOW_DISSECTOR_KEY_BASIC);
 	match->dissector.offset[FLOW_DISSECTOR_KEY_BASIC] =
 		offsetof(struct ethtool_rx_flow_key, basic);
 
@@ -3291,7 +3291,7 @@ ethtool_rx_flow_rule_create(const struct ethtool_rx_flow_spec_input *input)
 		if (ext_m_spec->vlan_etype ||
 		    ext_m_spec->vlan_tci) {
 			match->dissector.used_keys |=
-				BIT(FLOW_DISSECTOR_KEY_VLAN);
+				BIT_ULL(FLOW_DISSECTOR_KEY_VLAN);
 			match->dissector.offset[FLOW_DISSECTOR_KEY_VLAN] =
 				offsetof(struct ethtool_rx_flow_key, vlan);
 		}
@@ -3306,7 +3306,7 @@ ethtool_rx_flow_rule_create(const struct ethtool_rx_flow_spec_input *input)
 		       ETH_ALEN);
 
 		match->dissector.used_keys |=
-			BIT(FLOW_DISSECTOR_KEY_ETH_ADDRS);
+			BIT_ULL(FLOW_DISSECTOR_KEY_ETH_ADDRS);
 		match->dissector.offset[FLOW_DISSECTOR_KEY_ETH_ADDRS] =
 			offsetof(struct ethtool_rx_flow_key, eth_addrs);
 	}

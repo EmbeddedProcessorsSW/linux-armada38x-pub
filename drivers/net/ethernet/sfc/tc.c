@@ -144,9 +144,9 @@ static int efx_tc_flower_parse_match(struct efx_nic *efx,
 		}
 	}
 	if (dissector->used_keys &
-	    ~(BIT(FLOW_DISSECTOR_KEY_CONTROL) |
-	      BIT(FLOW_DISSECTOR_KEY_BASIC))) {
-		efx_tc_err(efx, "Unsupported flower keys %#x\n", dissector->used_keys);
+	    ~(BIT_ULL(FLOW_DISSECTOR_KEY_CONTROL) |
+	      BIT_ULL(FLOW_DISSECTOR_KEY_BASIC))) {
+		efx_tc_err(efx, "Unsupported flower keys %#llx\n", dissector->used_keys);
 		NL_SET_ERR_MSG_MOD(extack, "Unsupported flower keys encountered");
 		return -EOPNOTSUPP;
 	}
