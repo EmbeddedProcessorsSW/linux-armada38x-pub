@@ -1169,8 +1169,7 @@ int otx2_add_flow(struct otx2_nic *pfvf, struct ethtool_rxnfc *nfc)
 	 * e.g.
 	 * 1. ethtool -U <netdev> ... action -1  ==> vf_num:255
 	 * 2. ethtool -U <netdev> ... action <queue_num>  ==> vf_num:0
-	 * 3. ethtool -U <netdev> ... vf <vf_idx> queue <queue_num>  ==>
-	 *    vf_num:vf_idx+1
+	 * 3. ethtool -U <netdev> ... vf <vf_idx> queue <queue_num>  ==> vf_num:vf_idx+1
 	 */
 	vf_num = ethtool_get_flow_spec_ring_vf(fsp->ring_cookie);
 	if (!is_otx2_vf(pfvf->pcifunc) && vf_num)
