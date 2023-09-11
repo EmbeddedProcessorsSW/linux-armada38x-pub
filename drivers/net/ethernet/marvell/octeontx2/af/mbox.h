@@ -1773,6 +1773,12 @@ struct flow_msg {
 	__be16 vlan_itci;
 	__be32 gtpu_teid;
 	__be32 gtpc_teid;
+#define OTX2_FLOWER_MASK_MPLS_LB		GENMASK(31, 12)
+#define OTX2_FLOWER_MASK_MPLS_TC		GENMASK(11, 9)
+#define OTX2_FLOWER_MASK_MPLS_BOS		BIT(8)
+#define OTX2_FLOWER_MASK_MPLS_TTL		GENMASK(7, 0)
+#define OTX2_FLOWER_MASK_MPLS_NON_TTL		GENMASK(31, 8)
+	__be32 mpls_lse[4];
 };
 
 struct npc_install_flow_req {

@@ -46,6 +46,14 @@ static const char * const npc_flow_names[] = {
 	[NPC_LXMB]	= "Mcast/Bcast header ",
 	[NPC_GTPU_TEID]	= "gtp-u teid ",
 	[NPC_GTPC_TEID]	= "gtp-c teid ",
+	[NPC_MPLS1_LBTCBOS] = "lse depth 1 label tc bos",
+	[NPC_MPLS1_TTL]     = "lse depth 1 ttl",
+	[NPC_MPLS2_LBTCBOS] = "lse depth 2 label tc bos",
+	[NPC_MPLS2_TTL]     = "lse depth 2 ttl",
+	[NPC_MPLS3_LBTCBOS] = "lse depth 3 label tc bos",
+	[NPC_MPLS3_TTL]     = "lse depth 3 ttl",
+	[NPC_MPLS4_LBTCBOS] = "lse depth 4 label tc bos",
+	[NPC_MPLS4_TTL]     = "lse depth 4",
 	[NPC_UNKNOWN]	= "unknown",
 };
 
@@ -530,6 +538,14 @@ do {									       \
 	NPC_SCAN_HDR(NPC_FDSA_VAL, NPC_LID_LB, NPC_LT_LB_FDSA, 1, 1);
 	NPC_SCAN_HDR(NPC_GTPU_TEID, NPC_LID_LE, NPC_LT_LE_GTPU, 4, 4);
 	NPC_SCAN_HDR(NPC_GTPC_TEID, NPC_LID_LE, NPC_LT_LE_GTPC, 4, 4);
+	NPC_SCAN_HDR(NPC_MPLS1_LBTCBOS, NPC_LID_LC, NPC_LT_LC_MPLS, 0, 3);
+	NPC_SCAN_HDR(NPC_MPLS1_TTL, NPC_LID_LC, NPC_LT_LC_MPLS, 3, 1);
+	NPC_SCAN_HDR(NPC_MPLS2_LBTCBOS, NPC_LID_LC, NPC_LT_LC_MPLS, 4, 3);
+	NPC_SCAN_HDR(NPC_MPLS2_TTL, NPC_LID_LC, NPC_LT_LC_MPLS, 7, 1);
+	NPC_SCAN_HDR(NPC_MPLS3_LBTCBOS, NPC_LID_LC, NPC_LT_LC_MPLS, 8, 3);
+	NPC_SCAN_HDR(NPC_MPLS3_TTL, NPC_LID_LC, NPC_LT_LC_MPLS, 11, 1);
+	NPC_SCAN_HDR(NPC_MPLS4_LBTCBOS, NPC_LID_LC, NPC_LT_LC_MPLS, 12, 3);
+	NPC_SCAN_HDR(NPC_MPLS4_TTL, NPC_LID_LC, NPC_LT_LC_MPLS, 15, 1);
 	NPC_SCAN_HDR(NPC_DMAC, NPC_LID_LA, la_ltype, la_start, 6);
 
 	NPC_SCAN_HDR(NPC_IPSEC_SPI, NPC_LID_LD, NPC_LT_LD_AH, 4, 4);
@@ -603,6 +619,11 @@ static void npc_set_features(struct rvu *rvu, int blkaddr, u8 intf)
 	/* for L2M/L2B/L3M/L3B, check if the type is present in the key */
 	if (npc_check_field(rvu, blkaddr, NPC_LXMB, intf))
 		*features |= BIT_ULL(NPC_LXMB);
+
+	for (hdr = NPC_MPLS1_LBTCBOS; hdr <= NPC_MPLS4_TTL; hdr++) {
+		if (npc_check_field(rvu, blkaddr, hdr, intf))
+			*features |= BIT_ULL(hdr);
+	}
 }
 
 /* Scan key extraction profile and record how fields of our interest
@@ -989,6 +1010,30 @@ do {									      \
 		       ntohl(mask->gtpu_teid), 0);
 	NPC_WRITE_FLOW(NPC_GTPC_TEID, gtpc_teid, ntohl(pkt->gtpc_teid), 0,
 		       ntohl(mask->gtpc_teid), 0);
+	NPC_WRITE_FLOW(NPC_MPLS1_LBTCBOS, mpls_lse,
+		       FIELD_GET(OTX2_FLOWER_MASK_MPLS_NON_TTL, pkt->mpls_lse[0]), 0,
+		       FIELD_GET(OTX2_FLOWER_MASK_MPLS_NON_TTL, mask->mpls_lse[0]), 0);
+	NPC_WRITE_FLOW(NPC_MPLS1_TTL, mpls_lse,
+		       FIELD_GET(OTX2_FLOWER_MASK_MPLS_TTL, pkt->mpls_lse[0]), 0,
+		       FIELD_GET(OTX2_FLOWER_MASK_MPLS_TTL, mask->mpls_lse[0]), 0);
+	NPC_WRITE_FLOW(NPC_MPLS2_LBTCBOS, mpls_lse,
+		       FIELD_GET(OTX2_FLOWER_MASK_MPLS_NON_TTL, pkt->mpls_lse[1]), 0,
+		       FIELD_GET(OTX2_FLOWER_MASK_MPLS_NON_TTL, mask->mpls_lse[1]), 0);
+	NPC_WRITE_FLOW(NPC_MPLS2_TTL, mpls_lse,
+		       FIELD_GET(OTX2_FLOWER_MASK_MPLS_TTL, pkt->mpls_lse[1]), 0,
+		       FIELD_GET(OTX2_FLOWER_MASK_MPLS_TTL, mask->mpls_lse[1]), 0);
+	NPC_WRITE_FLOW(NPC_MPLS3_LBTCBOS, mpls_lse,
+		       FIELD_GET(OTX2_FLOWER_MASK_MPLS_NON_TTL, pkt->mpls_lse[2]), 0,
+		       FIELD_GET(OTX2_FLOWER_MASK_MPLS_NON_TTL, mask->mpls_lse[2]), 0);
+	NPC_WRITE_FLOW(NPC_MPLS3_TTL, mpls_lse,
+		       FIELD_GET(OTX2_FLOWER_MASK_MPLS_TTL, pkt->mpls_lse[2]), 0,
+		       FIELD_GET(OTX2_FLOWER_MASK_MPLS_TTL, mask->mpls_lse[2]), 0);
+	NPC_WRITE_FLOW(NPC_MPLS4_LBTCBOS, mpls_lse,
+		       FIELD_GET(OTX2_FLOWER_MASK_MPLS_NON_TTL, pkt->mpls_lse[3]), 0,
+		       FIELD_GET(OTX2_FLOWER_MASK_MPLS_NON_TTL, mask->mpls_lse[3]), 0);
+	NPC_WRITE_FLOW(NPC_MPLS4_TTL, mpls_lse,
+		       FIELD_GET(OTX2_FLOWER_MASK_MPLS_TTL, pkt->mpls_lse[3]), 0,
+		       FIELD_GET(OTX2_FLOWER_MASK_MPLS_TTL, mask->mpls_lse[3]), 0);
 	npc_update_ipv6_flow(rvu, entry, features, pkt, mask, output, intf);
 	npc_update_vlan_features(rvu, entry, features, intf);
 
