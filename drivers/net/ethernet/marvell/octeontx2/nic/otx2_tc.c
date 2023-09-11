@@ -1457,8 +1457,8 @@ void otx2_shutdown_tc(struct otx2_nic *nic)
 }
 EXPORT_SYMBOL(otx2_shutdown_tc);
 
-static void otx2_tc_config_ingress_rule(struct otx2_nic *nic,
-					struct otx2_tc_flow *node)
+void otx2_tc_config_ingress_rule(struct otx2_nic *nic,
+				 struct otx2_tc_flow *node)
 {
 	struct npc_install_flow_req *req;
 
