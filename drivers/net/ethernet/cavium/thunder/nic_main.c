@@ -1264,12 +1264,13 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
 {
 	union nic_mbx mbx = {};
 	u64 *mbx_data;
+	int bgx, lmac;
 	u64 mbx_addr;
 	u64 reg_addr;
-	u64 cfg;
-	int bgx, lmac;
-	int i;
+	u64 cam_dmac;
 	int ret = 0;
+	u64 cfg;
+	int i;
 
 	mbx_addr = nic_get_mbx_addr(vf);
 	mbx_data = (u64 *)&mbx;
@@ -1347,6 +1348,11 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
 		lmac = mbx.mac.vf_id;
 		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[lmac]);
 		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[lmac]);
+		cam_dmac = ether_addr_to_u64(mbx.mac.mac_addr);
+		bgx_set_dmac_cam_filter(nic->node, bgx, lmac,
+					cam_dmac,
+					vf < NIC_VF_PER_MBX_REG ? vf :
+					vf - NIC_VF_PER_MBX_REG);
 		bgx_set_lmac_mac(nic->node, bgx, lmac, mbx.mac.mac_addr);
 		break;
 	case NIC_MBOX_MSG_SET_MAX_FRS:

@@ -101,6 +101,8 @@ static void bgx_poll_for_link(struct work_struct *work);
 
 static int (*bgx_port_ctx_set)(int node, int bgx, int lmac, int ctx,
 			       int dp_idx);
+static int bgx_set_dmac_cam_filter_mac(struct bgx *bgx, int lmacid,
+				       u64 cam_dmac, u8 idx);
 
 /* Supported devices */
 static const struct pci_device_id bgx_id_table[] = {
@@ -281,11 +283,15 @@ EXPORT_SYMBOL(bgx_get_lmac_mac);
 void bgx_set_lmac_mac(int node, int bgx_idx, int lmacid, const u8 *mac)
 {
 	struct bgx *bgx = get_bgx(node, bgx_idx);
+	struct lmac *lmac = &bgx->lmac[lmacid];
+	u64 cam_dmac;
 
 	if (!bgx)
 		return;
 
 	ether_addr_copy(bgx->lmac[lmacid].mac, mac);
+	cam_dmac = ether_addr_to_u64(mac);
+	bgx_set_dmac_cam_filter_mac(bgx, lmacid, cam_dmac, 0);
 }
 EXPORT_SYMBOL(bgx_set_lmac_mac);
 
