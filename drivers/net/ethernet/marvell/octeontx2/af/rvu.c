@@ -1274,6 +1274,12 @@ cpt:
 		goto sso_err;
 	}
 
+	err = rvu_cpt_init(rvu);
+	if (err) {
+		dev_err(rvu->dev, "%s: Failed to initialize cpt\n", __func__);
+		goto sso_err;
+	}
+
 	rvu_program_channels(rvu);
 
 	err = rvu_mcs_init(rvu);
@@ -1282,16 +1288,8 @@ cpt:
 		goto sso_err;
 	}
 
-	err = rvu_cpt_init(rvu);
-	if (err) {
-		dev_err(rvu->dev, "%s: Failed to initialize cpt\n", __func__);
-		goto mcs_err;
-	}
-
 	return 0;
 
-mcs_err:
-	rvu_mcs_exit(rvu);
 sso_err:
 	rvu_sso_freemem(rvu);
 nix_err:
@@ -1457,7 +1455,7 @@ int rvu_get_blkaddr_from_slot(struct rvu *rvu, int blktype, u16 pcifunc,
 	int numlfs, total_lfs = 0, nr_blocks = 0;
 	int i, num_blkaddr[BLK_COUNT] = { 0 };
 	struct rvu_block *block;
-	int blkaddr;
+	int blkaddr = -ENODEV;
 	u16 start_slot;
 
 	if (!is_blktype_attached(pfvf, blktype))
@@ -2728,6 +2726,7 @@ static void rvu_mbox_destroy(struct mbox_wq_info *mw)
 	int devid;
 
 	if (mw->mbox_wq) {
+		flush_workqueue(mw->mbox_wq);
 		destroy_workqueue(mw->mbox_wq);
 		mw->mbox_wq = NULL;
 	}
@@ -2841,7 +2840,7 @@ static void rvu_npa_lf_mapped_nix_lf_teardown(struct rvu *rvu, u16 pcifunc)
 	int blkaddr, lf;
 	u64 regval;
 
-	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NIX, 0);
+	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NIX, pcifunc);
 	if (blkaddr < 0)
 		return;
 
@@ -2884,6 +2883,9 @@ static void rvu_npa_lf_mapped_sso_lf_teardown(struct rvu *rvu, u16 pcifunc)
 
 	pcifunc_arr = kcalloc(rvu->hw->total_pfs + rvu->hw->total_vfs,
 			      sizeof(*pcifunc_arr), GFP_KERNEL);
+	if (!pcifunc_arr)
+		return;
+
 	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_SSO, 0);
 	if (blkaddr < 0)
 		return;
@@ -3532,6 +3534,7 @@ fail:
 static void rvu_flr_wq_destroy(struct rvu *rvu)
 {
 	if (rvu->flr_wq) {
+		flush_workqueue(rvu->flr_wq);
 		destroy_workqueue(rvu->flr_wq);
 		rvu->flr_wq = NULL;
 	}
@@ -3753,7 +3756,6 @@ static int rvu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 
 	pci_set_master(pdev);
-
 	rvu->ptp = ptp_get();
 	if (IS_ERR(rvu->ptp)) {
 		err = PTR_ERR(rvu->ptp);
