@@ -1387,6 +1387,7 @@ static void sve_init_regs(void)
 void do_sve_acc(unsigned long esr, struct pt_regs *regs)
 {
 	task_isolation_kernel_enter();
+	task_isolation_interrupt(" %s from isolated task\n", __func__);
 
 	/* Even if we chose not to use SVE, the hardware could still trap: */
 	if (unlikely(!system_supports_sve()) || WARN_ON(is_compat_task())) {
@@ -1475,7 +1476,7 @@ void do_sme_acc(unsigned long esr, struct pt_regs *regs)
 void do_fpsimd_acc(unsigned long esr, struct pt_regs *regs)
 {
 	task_isolation_kernel_enter();
-
+	task_isolation_interrupt(" %s from isolated task\n", __func__);
 	/* TODO: implement lazy context saving/restoring */
 	WARN_ON(1);
 }
@@ -1488,6 +1489,8 @@ void do_fpsimd_exc(unsigned long esr, struct pt_regs *regs)
 	unsigned int si_code = FPE_FLTUNK;
 
 	task_isolation_kernel_enter();
+
+	task_isolation_interrupt(" %s from isolated task\n", __func__);
 
 	if (esr & ESR_ELx_FP_EXC_TFV) {
 		if (esr & FPEXC_IOF)
