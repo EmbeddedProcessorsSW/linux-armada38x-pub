@@ -1409,7 +1409,7 @@ int otx2_pool_init(struct otx2_nic *pfvf, u16 pool_id,
 	struct page_pool_params pp_params = { 0 };
 	struct npa_aq_enq_req *aq;
 	struct otx2_pool *pool;
-	int err;
+	int err, sz;
 
 	pool = &pfvf->qset.pool[pool_id];
 	/* Alloc memory for stack which is used to store buffer pointers */
@@ -1455,6 +1455,8 @@ int otx2_pool_init(struct otx2_nic *pfvf, u16 pool_id,
 		return 0;
 	}
 
+	sz = ALIGN(ALIGN(SKB_DATA_ALIGN(buf_size), OTX2_ALIGN), PAGE_SIZE);
+	pp_params.order = (sz / PAGE_SIZE) - 1;
 	pp_params.flags = PP_FLAG_PAGE_FRAG | PP_FLAG_DMA_MAP;
 	pp_params.pool_size = min(OTX2_PAGE_POOL_SZ, numptrs);
 	pp_params.nid = NUMA_NO_NODE;
