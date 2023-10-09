@@ -15,6 +15,11 @@
 #define OTX2_CPT_MAX_HASH_KEY_SIZE   64
 #define OTX2_CPT_MAX_KEY_SIZE (OTX2_CPT_MAX_ENC_KEY_SIZE + \
 			       OTX2_CPT_MAX_HASH_KEY_SIZE)
+#define DMA_MODE_FLAG(dma_mode) \
+	(((dma_mode) == OTX2_CPT_DMA_MODE_SG) ? (1 << 7) : 0)
+#define OUTPUT_MODE_FLAG(mode) \
+	(((mode) == OTX2_CPT_OUT_MODE_INPLACE) ? (1 << 6) : 0)
+
 enum otx2_cpt_request_type {
 	OTX2_CPT_ENC_DEC_REQ            = 0x1,
 	OTX2_CPT_AEAD_ENC_DEC_REQ       = 0x2,
@@ -25,6 +30,7 @@ enum otx2_cpt_request_type {
 enum otx2_cpt_major_opcodes {
 	OTX2_CPT_MAJOR_OP_MISC = 0x01,
 	OTX2_CPT_MAJOR_OP_FC   = 0x33,
+	OTX2_CPT_MAJOR_OP_HASH = 0x34,
 	OTX2_CPT_MAJOR_OP_HMAC = 0x35,
 };
 
@@ -179,5 +185,7 @@ struct otx2_cpt_aead_ctx {
 int otx2_cpt_crypto_init(struct pci_dev *pdev, struct module *mod,
 			 int num_queues, int num_devices);
 void otx2_cpt_crypto_exit(struct pci_dev *pdev, struct module *mod);
-
+int otx2_cpt_register_hmac_hash_algs(void);
+void otx2_cpt_unregister_hmac_hash_algs(void);
+int otx2_cpt_dev_get(struct pci_dev **pdev, int *cpu_num);
 #endif /* __OTX2_CPT_ALGS_H */
