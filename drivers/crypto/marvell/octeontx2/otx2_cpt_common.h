@@ -192,6 +192,14 @@ static inline void otx2_cpt_set_hw_caps(struct pci_dev *pdev,
 	}
 }
 
+static inline bool cpt_is_errata_38550_exists(struct pci_dev *pdev)
+{
+	if (is_dev_otx2(pdev) || is_dev_cn10ka_ax(pdev))
+		return true;
+
+	return false;
+}
+
 static inline bool cpt_feature_rxc_icb_cnt(struct pci_dev *pdev)
 {
 	if (!is_dev_otx2(pdev) && !is_dev_cn10ka_ax(pdev))
