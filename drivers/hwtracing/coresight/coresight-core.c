@@ -1833,12 +1833,17 @@ static int __init coresight_init(void)
 	/* Register function to be called for panic */
 	ret = atomic_notifier_chain_register(&panic_notifier_list,
 					     &coresight_notifier);
+	if (ret)
+		goto exit_etm_perf;
 
 	/* initialise the coresight syscfg API */
 	ret = cscfg_init();
 	if (!ret)
 		return 0;
 
+	atomic_notifier_chain_unregister(&panic_notifier_list,
+					 &coresight_notifier);
+exit_etm_perf:
 	etm_perf_exit();
 exit_bus_unregister:
 	bus_unregister(&coresight_bustype);
@@ -1849,6 +1854,8 @@ exit_bus_unregister:
 static void __exit coresight_exit(void)
 {
 	cscfg_exit();
+	atomic_notifier_chain_unregister(&panic_notifier_list,
+					 &coresight_notifier);
 	etm_perf_exit();
 	bus_unregister(&coresight_bustype);
 }
