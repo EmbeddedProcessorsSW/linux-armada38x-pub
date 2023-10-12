@@ -21,6 +21,7 @@
 
 #include "rvu_trace.h"
 #include "rvu_npc_hash.h"
+#include "rvu_eblock.h"
 
 #define DRV_NAME	"rvu_af"
 #define DRV_STRING      "Marvell OcteonTX2 RVU Admin Function Driver"
@@ -522,8 +523,10 @@ static void rvu_check_block_implemented(struct rvu *rvu)
 	for (blkid = 0; blkid < BLK_COUNT; blkid++) {
 		block = &hw->block[blkid];
 		cfg = rvupf_read64(rvu, RVU_PF_BLOCK_ADDRX_DISC(blkid));
-		if (cfg & BIT_ULL(11))
+		if (cfg & BIT_ULL(11)) {
 			block->implemented = true;
+			rvu_eblock_device_add(rvu, block, blkid);
+		}
 	}
 }
 
@@ -3835,8 +3838,11 @@ static int rvu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		ptp_start(rvu, rvu->fwdata->sclk, rvu->fwdata->ptp_ext_clk_rate,
 			  rvu->fwdata->ptp_ext_tstamp);
 
+	rvu_eblock_init();
+
 	return 0;
 err_dl:
+	rvu_eblock_exit();
 	rvu_unregister_dl(rvu);
 err_irq:
 	rvu_unregister_interrupts(rvu);
@@ -3879,6 +3885,7 @@ static void rvu_remove(struct pci_dev *pdev)
 	rvu_disable_sriov(rvu);
 	rvu_reset_all_blocks(rvu);
 	rvu_free_hw_resources(rvu);
+	rvu_eblock_exit();
 	rvu_clear_rvum_blk_revid(rvu);
 	ptp_put(rvu->ptp);
 	pci_release_regions(pdev);
@@ -3918,6 +3925,8 @@ static int __init rvu_init_module(void)
 	if (err < 0)
 		goto rvu_err;
 
+	rvu_eblock_module_init();
+
 	return 0;
 rvu_err:
 	pci_unregister_driver(&mcs_driver);
@@ -3931,6 +3940,8 @@ ptp_err:
 
 static void __exit rvu_cleanup_module(void)
 {
+	rvu_eblock_module_exit();
+
 	pci_unregister_driver(&rvu_driver);
 	pci_unregister_driver(&mcs_driver);
 	pci_unregister_driver(&ptp_driver);
