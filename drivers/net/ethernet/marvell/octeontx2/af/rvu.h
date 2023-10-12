@@ -213,17 +213,6 @@ struct npc_mcam {
 	struct list_head mcam_rules;
 };
 
-struct ree_rsrc {
-	struct qmem	*graph_ctx;	/* Graph base address - used by HW */
-	struct qmem	*prefix_ctx;	/* Prefix blocks - used by HW */
-	void		**ruledb;	/* ROF file from application */
-	u8		*ruledbi;	/* Incremental checksum instructions */
-	u32		aq_head;	/* AF AQ head address */
-	u32		ruledb_len;	/* Length of ruledb */
-	u32		ruledbi_len;	/* Length of ruledbi */
-	u8		ruledb_blocks;	/* Number of blocks pointed by ruledb */
-};
-
 struct sso_aq_thr {
 	u64 iaq_rsvd;
 	u64 iaq_max;
@@ -1180,12 +1169,6 @@ void rvu_nix_block_cn10k_init(struct rvu *rvu, struct nix_hw *nix_hw);
 /* CN10K RVU - LMT*/
 void rvu_reset_lmt_map_tbl(struct rvu *rvu, u16 pcifunc);
 void rvu_apr_block_cn10k_init(struct rvu *rvu);
-
-/* REE APIs */
-int rvu_ree_init(struct rvu *rvu);
-void rvu_ree_freemem(struct rvu *rvu);
-int rvu_ree_register_interrupts(struct rvu *rvu);
-void rvu_ree_unregister_interrupts(struct rvu *rvu);
 
 /* TIM APIs */
 int rvu_tim_init(struct rvu *rvu);
