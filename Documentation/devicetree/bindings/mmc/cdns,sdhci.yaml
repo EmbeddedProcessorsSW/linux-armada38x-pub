@@ -4,7 +4,7 @@
 $id: http://devicetree.org/schemas/mmc/cdns,sdhci.yaml#
 $schema: http://devicetree.org/meta-schemas/core.yaml#
 
-title: Cadence SD/SDIO/eMMC Host Controller (SD4HC)
+title: Cadence SD/SDIO/eMMC Host Controller (SD4HC, SD6HC)
 
 maintainers:
   - Masahiro Yamada <yamada.masahiro@socionext.com>
@@ -19,6 +19,7 @@ properties:
           - microchip,mpfs-sd4hc
           - socionext,uniphier-sd4hc
       - const: cdns,sd4hc
+      - const: cdns,sd6hc
 
   reg:
     maxItems: 1
@@ -110,6 +111,34 @@ properties:
     $ref: "/schemas/types.yaml#/definitions/uint32"
     minimum: 0
     maximum: 0x7f
+
+  cdns,iocell_input_delay:
+    description: Delay in ps across the input IO cells
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+
+  cdns,iocell_output_delay:
+    description: Delay in ps across the output IO cells
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+
+  cdns,delay_element:
+    description: Delay element in ps used for calculating phy timings
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+
+  cdns,read_dqs_cmd_delay:
+    description: Command delay used in HS200 tuning
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+
+  cdns,tune_val_start:
+    description: Staring value of data delay used in HS200 tuning
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+
+  cdns,tune_val_step:
+    description: Incremental value of data delay used in HS200 tuning
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+
+  cdns,max_tune_iter:
+    description: Maximum number of iterations to complete the HS200 tuning process
+    $ref: "/schemas/types.yaml#/definitions/uint32"
 
 required:
   - compatible
