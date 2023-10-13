@@ -1101,6 +1101,14 @@ config MMC_OWL
 config MMC_SDHCI_EXTERNAL_DMA
 	bool
 
+config MMC_SDHCI_TIMEOUT
+	int
+	default 1 if MMC_SDHCI_CADENCE
+	default 10
+	depends on MMC_SDHCI
+	help
+	  Default timeout value for command and data.
+
 config MMC_LITEX
 	tristate "LiteX MMC Host Controller support"
 	depends on ((PPC_MICROWATT || LITEX) && OF && HAVE_CLK) || COMPILE_TEST
