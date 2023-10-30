@@ -610,20 +610,26 @@ static void cnf10k_rfoe_process_rx_pkt(struct cnf10k_rfoe_ndev_priv *priv,
 static int cnf10k_rfoe_process_rx_flow(struct cnf10k_rfoe_ndev_priv *priv,
 				       int pkt_type, int budget)
 {
+	struct otx2_bphy_cdev_priv *cdev_priv = priv->cdev_priv;
 	int count = 0, processed_pkts = 0;
 	struct cnf10k_rx_ft_cfg *ft_cfg;
-	u16 nxt_buf, sw_buf;
-	u64 mbt_status;
+	u64 mbt_cfg;
+	u16 nxt_buf;
 	int *mbt_last_idx = &priv->rfoe_common->rx_mbt_last_idx[pkt_type];
 	u16 *prv_nxt_buf = &priv->rfoe_common->nxt_buf[pkt_type];
 
 	ft_cfg = &priv->rx_ft_cfg[pkt_type];
 
+	spin_lock(&cdev_priv->mbt_lock);
 	/* read mbt nxt_buf */
-	mbt_status = readq(priv->rfoe_reg_base +
-			   CNF10K_RFOEX_RX_MBT_STATUS(priv->rfoe_num, ft_cfg->mbt_idx));
-	nxt_buf = mbt_status & 0xffff;
-	sw_buf = (mbt_status >> 16) & 0xffff;
+	writeq(ft_cfg->mbt_idx,
+	       priv->rfoe_reg_base +
+	       CNF10K_RFOEX_RX_INDIRECT_INDEX_OFFSET(priv->rfoe_num));
+	mbt_cfg = readq(priv->rfoe_reg_base +
+			CNF10K_RFOEX_RX_IND_MBT_CFG(priv->rfoe_num));
+	spin_unlock(&cdev_priv->mbt_lock);
+
+	nxt_buf = (mbt_cfg >> 32) & 0xffff;
 
 	/* no mbt entries to process */
 	if (nxt_buf == *prv_nxt_buf) {
@@ -658,13 +664,6 @@ static int cnf10k_rfoe_process_rx_flow(struct cnf10k_rfoe_ndev_priv *priv,
 
 		processed_pkts++;
 	}
-
-	/* update mbt sw_buf */
-	sw_buf += processed_pkts;
-	if (sw_buf > ft_cfg->num_bufs)
-		sw_buf -= ft_cfg->num_bufs;
-	writeq((sw_buf << 16), (priv->rfoe_reg_base +
-				CNF10K_RFOEX_RX_MBT_STATUS(priv->rfoe_num, ft_cfg->mbt_idx)));
 
 	return processed_pkts;
 }
@@ -1370,7 +1369,7 @@ static void cnf10k_rfoe_fill_rx_ft_cfg(struct cnf10k_rfoe_ndev_priv *priv,
 	struct otx2_bphy_cdev_priv *cdev_priv = priv->cdev_priv;
 	struct cnf10k_bphy_ndev_rbuf_info *rbuf_info;
 	struct cnf10k_rx_ft_cfg *ft_cfg;
-	u64 jdt_cfg0, iova, mbt_cfg;
+	u64 jdt_cfg0, iova;
 	int idx;
 
 	/* RX flow table configuration */
@@ -1408,19 +1407,6 @@ static void cnf10k_rfoe_fill_rx_ft_cfg(struct cnf10k_rfoe_ndev_priv *priv,
 		ft_cfg->priv = priv;
 		netif_napi_add(priv->netdev, &ft_cfg->napi,
 			       cnf10k_rfoe_napi_poll);
-
-		/* Enable MBT ring full drop enable */
-		spin_lock(&cdev_priv->mbt_lock);
-		writeq(ft_cfg->mbt_idx,
-		       priv->rfoe_reg_base +
-		       CNF10K_RFOEX_RX_INDIRECT_INDEX_OFFSET(priv->rfoe_num));
-		mbt_cfg = readq(priv->rfoe_reg_base +
-				CNF10K_RFOEX_RX_IND_MBT_CFG(priv->rfoe_num));
-		mbt_cfg |= (1ULL << 59);
-		writeq(mbt_cfg,
-		       (priv->rfoe_reg_base +
-			CNF10K_RFOEX_RX_IND_MBT_CFG(priv->rfoe_num)));
-		spin_unlock(&cdev_priv->mbt_lock);
 	}
 }
 
