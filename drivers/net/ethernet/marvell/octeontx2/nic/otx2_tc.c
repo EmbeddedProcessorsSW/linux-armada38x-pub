@@ -510,9 +510,16 @@ static int otx2_tc_parse_actions(struct otx2_nic *nic,
 			nr_police++;
 			break;
 		case FLOW_ACTION_MARK:
+			if (act->mark & ~OTX2_RX_MATCH_ID_MASK) {
+				NL_SET_ERR_MSG_MOD(extack, "Bad flow mark, only 16 bit supported");
+				return -EOPNOTSUPP;
+			}
 			mark = act->mark;
+			req->match_id = mark & 0xFFFFULL;
+			req->op = NIX_RX_ACTION_DEFAULT;
+			nic->flags |= OTX2_FLAG_TC_MARK_ENABLED;
+			nic->flow_cfg->mark_flows++;
 			break;
-
 		case FLOW_ACTION_RX_QUEUE_MAPPING:
 			req->op = NIX_RX_ACTIONOP_UCAST;
 			req->index = act->rx_queue;
@@ -1168,6 +1175,11 @@ static int otx2_tc_del_flow(struct otx2_nic *nic,
 			   tc_flow_cmd->cookie);
 		return -EINVAL;
 	}
+
+	/* Disable TC MARK flag if they are no rules with skbedit mark action */
+	if (flow_node->req.match_id)
+		if (!(--flow_cfg->mark_flows))
+			nic->flags &= ~OTX2_FLAG_TC_MARK_ENABLED;
 
 	if (flow_node->is_act_police) {
 		__clear_bit(flow_node->rq, &nic->rq_bmap);
