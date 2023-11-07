@@ -102,6 +102,13 @@ static void scmi_clk_atomic_disable(struct clk_hw *hw)
 	scmi_proto_clk_ops->disable_atomic(clk->ph, clk->id);
 }
 
+static int scmi_clk_get_available_rates(struct clk_hw *hw, u64 *rate)
+{
+	struct scmi_clk *clk = to_scmi_clk(hw);
+
+	return scmi_proto_clk_ops->available_rates(clk->ph, clk->id, rate);
+}
+
 /*
  * We can provide enable/disable atomic callbacks only if the underlying SCMI
  * transport for an SCMI instance is configured to handle SCMI commands in an
@@ -121,6 +128,7 @@ static const struct clk_ops scmi_clk_ops = {
 	.set_rate = scmi_clk_set_rate,
 	.prepare = scmi_clk_enable,
 	.unprepare = scmi_clk_disable,
+	.get_available_rates = scmi_clk_get_available_rates,
 };
 
 static const struct clk_ops scmi_atomic_clk_ops = {
