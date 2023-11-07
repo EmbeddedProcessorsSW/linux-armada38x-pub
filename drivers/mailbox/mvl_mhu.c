@@ -1,13 +1,9 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Marvell Message Handling Unit driver
  *
- * Copyright (C) 2019-2022 Marvell International Ltd.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
+ * Copyright (c) 2023 Marvell
+ * https://spdx.org/licenses/GPL-2.0-only.html
  */
 
 #define pr_fmt(fmt)	"mvl-mhu: " fmt
