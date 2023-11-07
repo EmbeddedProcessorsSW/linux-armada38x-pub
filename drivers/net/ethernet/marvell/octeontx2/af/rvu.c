@@ -3262,6 +3262,7 @@ static void rvu_unregister_interrupts(struct rvu *rvu)
 	int irq;
 
 	rvu_sso_unregister_interrupts(rvu);
+	rvu_tim_unregister_interrupts(rvu);
 	rvu_cpt_unregister_interrupts(rvu);
 
 	/* Disable the Mbox interrupt */
@@ -3475,6 +3476,10 @@ static int rvu_register_interrupts(struct rvu *rvu)
 	rvu->irq_allocated[offset] = true;
 
 	ret = rvu_sso_register_interrupts(rvu);
+	if (ret)
+		goto fail;
+
+	ret = rvu_tim_register_interrupts(rvu);
 	if (ret)
 		goto fail;
 
