@@ -102,16 +102,17 @@ static int thunderx_gpio_request(struct gpio_chip *chip, unsigned int line)
 static int thunderx_gpio_dir_in(struct gpio_chip *chip, unsigned int line)
 {
 	struct thunderx_gpio *txgpio = gpiochip_get_data(chip);
+	unsigned long flags;
 
 	if (!thunderx_gpio_is_gpio(txgpio, line))
 		return -EIO;
 
-	raw_spin_lock(&txgpio->lock);
+	raw_spin_lock_irqsave(&txgpio->lock, flags);
 	clear_bit(line, txgpio->invert_mask);
 	clear_bit(line, txgpio->od_mask);
 	writeq(txgpio->line_entries[line].fil_bits,
 	       txgpio->register_base + bit_cfg_reg(line));
-	raw_spin_unlock(&txgpio->lock);
+	raw_spin_unlock_irqrestore(&txgpio->lock, flags);
 	return 0;
 }
 
@@ -133,11 +134,12 @@ static int thunderx_gpio_dir_out(struct gpio_chip *chip, unsigned int line,
 {
 	struct thunderx_gpio *txgpio = gpiochip_get_data(chip);
 	u64 bit_cfg = txgpio->line_entries[line].fil_bits | GPIO_BIT_CFG_TX_OE;
+	unsigned long flags;
 
 	if (!thunderx_gpio_is_gpio(txgpio, line))
 		return -EIO;
 
-	raw_spin_lock(&txgpio->lock);
+	raw_spin_lock_irqsave(&txgpio->lock, flags);
 
 	thunderx_gpio_set(chip, line, value);
 
@@ -149,7 +151,7 @@ static int thunderx_gpio_dir_out(struct gpio_chip *chip, unsigned int line,
 
 	writeq(bit_cfg, txgpio->register_base + bit_cfg_reg(line));
 
-	raw_spin_unlock(&txgpio->lock);
+	raw_spin_unlock_irqrestore(&txgpio->lock, flags);
 	return 0;
 }
 
@@ -186,11 +188,12 @@ static int thunderx_gpio_set_config(struct gpio_chip *chip,
 	int ret = -ENOTSUPP;
 	struct thunderx_gpio *txgpio = gpiochip_get_data(chip);
 	void __iomem *reg = txgpio->register_base + (bank * GPIO_2ND_BANK) + GPIO_TX_SET;
+	unsigned long flags;
 
 	if (!thunderx_gpio_is_gpio(txgpio, line))
 		return -EIO;
 
-	raw_spin_lock(&txgpio->lock);
+	raw_spin_lock_irqsave(&txgpio->lock, flags);
 	orig_invert = test_bit(line, txgpio->invert_mask);
 	new_invert  = orig_invert;
 	orig_od = test_bit(line, txgpio->od_mask);
@@ -241,7 +244,7 @@ static int thunderx_gpio_set_config(struct gpio_chip *chip,
 	default:
 		break;
 	}
-	raw_spin_unlock(&txgpio->lock);
+	raw_spin_unlock_irqrestore(&txgpio->lock, flags);
 
 	/*
 	 * If currently output and OPEN_DRAIN changed, install the new
@@ -327,12 +330,14 @@ static int thunderx_gpio_irq_set_type(struct irq_data *d,
 	struct thunderx_gpio *txgpio = gpiochip_get_data(gc);
 	struct thunderx_line *txline =
 		&txgpio->line_entries[irqd_to_hwirq(d)];
+	unsigned long flags;
 	u64 bit_cfg;
 
 	irqd_set_trigger_type(d, flow_type);
 
 	bit_cfg = txline->fil_bits | GPIO_BIT_CFG_INT_EN;
 
+	raw_spin_lock_irqsave(&txgpio->lock, flags);
 	if (flow_type & IRQ_TYPE_EDGE_BOTH) {
 		irq_set_handler_locked(d, handle_fasteoi_ack_irq);
 		bit_cfg |= GPIO_BIT_CFG_INT_TYPE;
@@ -340,7 +345,6 @@ static int thunderx_gpio_irq_set_type(struct irq_data *d,
 		irq_set_handler_locked(d, handle_fasteoi_mask_irq);
 	}
 
-	raw_spin_lock(&txgpio->lock);
 	if (flow_type & (IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_LEVEL_LOW)) {
 		bit_cfg |= GPIO_BIT_CFG_PIN_XOR;
 		set_bit(txline->line, txgpio->invert_mask);
@@ -349,7 +353,7 @@ static int thunderx_gpio_irq_set_type(struct irq_data *d,
 	}
 	clear_bit(txline->line, txgpio->od_mask);
 	writeq(bit_cfg, txgpio->register_base + bit_cfg_reg(txline->line));
-	raw_spin_unlock(&txgpio->lock);
+	raw_spin_unlock_irqrestore(&txgpio->lock, flags);
 
 	return IRQ_SET_MASK_OK;
 }
