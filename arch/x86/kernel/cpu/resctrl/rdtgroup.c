@@ -54,7 +54,7 @@ void resctrl_arch_sync_cpu_defaults(void *info)
 	 * executing task might have its own closid selected. Just reuse
 	 * the context switch code.
 	 */
-	resctrl_sched_in();
+	resctrl_sched_in(current);
 }
 
 static void l3_qos_cfg_update(void *arg)

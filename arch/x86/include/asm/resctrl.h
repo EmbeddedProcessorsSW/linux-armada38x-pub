@@ -178,10 +178,10 @@ static inline bool resctrl_arch_match_rmid(struct task_struct *tsk, u32 ignored,
 	return READ_ONCE(tsk->rmid) == rmid;
 }
 
-static inline void resctrl_sched_in(void)
+static inline void resctrl_sched_in(struct task_struct *tsk)
 {
 	if (static_branch_likely(&rdt_enable_key))
-		__resctrl_sched_in(task);
+		__resctrl_sched_in(tsk);
 }
 
 static inline u32 resctrl_arch_system_num_rmid_idx(void)
