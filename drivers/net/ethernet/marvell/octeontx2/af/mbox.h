@@ -1405,6 +1405,10 @@ struct nix_mcast_grp_destroy_req {
 	struct mbox_msghdr hdr;
 	/* Group id returned by nix_mcast_grp_create_rsp */
 	u32 mcast_grp_idx;
+	/* If AF is requesting for destroy, then set
+	 * it to '1'. Otherwise keep it to '0'
+	 */
+	u8 is_af;
 };
 
 struct nix_mcast_grp_update_req {
@@ -1427,6 +1431,10 @@ struct nix_mcast_grp_update_req {
 	/* Destination type. 0:Receive queue, 1:RSS*/
 	u8 dest_type[NIX_MCE_ENTRY_MAX];
 	u8 op;
+	/* If AF is requesting for update, then set
+	 * it to '1'. Otherwise keep it to '0'
+	 */
+	u8 is_af;
 };
 
 struct nix_mcast_grp_update_rsp {
