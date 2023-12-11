@@ -61,10 +61,19 @@ static int octeon_i2c_wait(struct octeon_i2c *i2c)
 		return octeon_i2c_test_iflg(i2c) ? 0 : -ETIMEDOUT;
 	}
 
-	i2c->int_enable(i2c);
-	time_left = wait_event_timeout(i2c->queue, octeon_i2c_test_iflg(i2c),
-				       i2c->adap.timeout);
-	i2c->int_disable(i2c);
+	if (i2c->twsi_freq <= FREQ_400KHZ) {
+		i2c->int_enable(i2c);
+		time_left = wait_event_timeout(i2c->queue,
+					       octeon_i2c_test_iflg(i2c),
+					       i2c->adap.timeout);
+		i2c->int_disable(i2c);
+	} else {
+		time_left = 1000; /* 1ms */
+		do {
+			if (time_left--)
+				__udelay(1);
+		} while (!octeon_i2c_test_iflg(i2c));
+	}
 
 	if (i2c->broken_irq_check && !time_left &&
 	    octeon_i2c_test_iflg(i2c)) {
@@ -608,7 +617,7 @@ int octeon_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 	struct octeon_i2c *i2c = i2c_get_adapdata(adap);
 	int i, ret = 0;
 
-	if (num == 1) {
+	if (num == 1 && i2c->twsi_freq <= FREQ_400KHZ) {
 		if (msgs[0].len > 0 && msgs[0].len <= 8) {
 			if (msgs[0].flags & I2C_M_RD)
 				ret = octeon_i2c_hlc_read(i2c, msgs);
@@ -616,7 +625,7 @@ int octeon_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 				ret = octeon_i2c_hlc_write(i2c, msgs);
 			goto out;
 		}
-	} else if (num == 2) {
+	} else if (num == 2 && i2c->twsi_freq <= FREQ_400KHZ) {
 		if ((msgs[0].flags & I2C_M_RD) == 0 &&
 		    (msgs[1].flags & I2C_M_RECV_LEN) == 0 &&
 		    msgs[0].len > 0 && msgs[0].len <= 2 &&
@@ -665,10 +674,13 @@ void octeon_i2c_set_clock(struct octeon_i2c *i2c)
 	 * Find divisors to produce target frequency, start with large delta
 	 * to cover wider range of divisors, note thp = TCLK half period.
 	 */
-	int thp = 0x18, mdiv = 2, ndiv = 0, delta_hz = huge_delta;
+	int ds = 10, thp = 0x18, mdiv = 2, ndiv = 0, delta_hz = huge_delta;
 
-	if (octeon_i2c_is_otx2(to_pci_dev(i2c->dev)))
+	if (octeon_i2c_is_otx2(to_pci_dev(i2c->dev))) {
 		thp = 0x3;
+		if (i2c->twsi_freq > FREQ_400KHZ)
+			ds = 15;
+	}
 
 	for (ndiv_idx = 0; ndiv_idx < 8 && delta_hz != 0; ndiv_idx++) {
 		/*
@@ -680,7 +692,7 @@ void octeon_i2c_set_clock(struct octeon_i2c *i2c)
 			 * For given ndiv and mdiv values check the
 			 * two closest thp values.
 			 */
-			tclk = i2c->twsi_freq * (mdiv_idx + 1) * 10;
+			tclk = i2c->twsi_freq * (mdiv_idx + 1) * ds;
 			tclk *= (1 << ndiv_idx);
 			if (octeon_i2c_is_otx2(to_pci_dev(i2c->dev)))
 				thp_base = (i2c->sys_freq / tclk) - 2;
@@ -698,7 +710,9 @@ void octeon_i2c_set_clock(struct octeon_i2c *i2c)
 					foscl = i2c->sys_freq /
 						(2 * (thp_idx + 1));
 				foscl = foscl / (1 << ndiv_idx);
-				foscl = foscl / (mdiv_idx + 1) / 10;
+				foscl = foscl / (mdiv_idx + 1) / ds;
+				if (foscl > i2c->twsi_freq)
+					continue;
 				diff = abs(foscl - i2c->twsi_freq);
 				/* Use it if smaller diff from target */
 				if (diff < delta_hz) {
@@ -712,6 +726,17 @@ void octeon_i2c_set_clock(struct octeon_i2c *i2c)
 	}
 	octeon_i2c_reg_write(i2c, SW_TWSI_OP_TWSI_CLK, thp);
 	octeon_i2c_reg_write(i2c, SW_TWSI_EOP_TWSI_CLKCTL, (mdiv << 3) | ndiv);
+	if (octeon_i2c_is_otx2(to_pci_dev(i2c->dev))) {
+		u64 mode;
+
+		mode = __raw_readq(i2c->twsi_base + MODE(i2c));
+		/* Set REFCLK_SRC and HS_MODE in TWSX_MODE register */
+		if (i2c->twsi_freq > FREQ_400KHZ)
+			mode |= BIT(4) | BIT(0);
+		else
+			mode &= ~(BIT(4) | BIT(0));
+		octeon_i2c_writeq_flush(mode, i2c->twsi_base + MODE(i2c));
+	}
 }
 
 int octeon_i2c_init_lowlevel(struct octeon_i2c *i2c)
