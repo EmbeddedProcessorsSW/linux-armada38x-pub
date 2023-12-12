@@ -99,5 +99,16 @@ config OCTEONTX_INFO
 	provides procfs interface to board information like board name, board revision
 	mac addresses, board serial number and more. These are boards housing Marvell
 	OcteonTX family chipsets.
+
+config MRVL_SWUP
+        tristate "Marvell firmware secure update"
+        depends on ARM64
+        help
+          Provide debugfs interface for firmware update.
+          Supported on cnXX family.
+          Currently supported operations:
+            -> TIM Version check
+            -> TIM Hash verification
+            -> TIM firmware update
 endmenu
 
