@@ -4,5 +4,5 @@
 # Copyright (C) 2023 Marvell International Ltd.
 #
 # commit id of base tag for this branch
-6c44e13dc284f7f4db17706ca48fd016d6b3d49a (tag: v6.1.46) Linux 6.1.46
+e7cddbb41b63252ddb5b7f8247da5d0b24adfac5 (tag: v6.1.67) Linux 6.1.67
 
