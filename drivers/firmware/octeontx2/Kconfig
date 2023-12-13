@@ -26,4 +26,15 @@ config MARVELL_UB_GEN_DRIVER
 	  By default the drvier handles CN9X and CN10X platforms.
 	  If unsure, say Y here.
 
+config MARVELL_PORTM_BOOT_CFG
+	bool "Marvell PORTM boot mode configuration interface"
+	depends on HAVE_ARM_SMCCC
+	select MARVELL_UB_GEN_DRIVER
+	default n
+	help
+	  Enable sysfs interface for PORTM mode configuration
+	  that will be effective from the next boot.
+	  Currently, only cn10k platforms are supported.
+	  If unsure, say N here.
+
 endif # MARVELL_UB
