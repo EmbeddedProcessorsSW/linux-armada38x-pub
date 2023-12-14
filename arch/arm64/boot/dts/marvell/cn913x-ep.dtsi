@@ -1,0 +1,76 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Copyright (C) 2023 Marvell
+ *
+ * Device tree include for the CN913x End Points.
+ */
+
+/ {
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		/* The PCI console memory must be reserved */
+		console_reserved: pci-console-nexus@3f000000 {
+			compatible = "marvell,pci-console-nexus-memory";
+			reg = <0 0x3f000000 0 0x1000000>;
+			no-map;
+		};
+	};
+
+	cp0 {
+		/delete-node/ pcie@600000;
+		/delete-node/ pcie@620000;
+		/delete-node/ pcie@640000;
+	};
+};
+
+&smmu {
+	/* Should only be enabled on RC side */
+	status = "disabled";
+};
+
+&dma_xor0 {
+	status = "okay";
+};
+
+&dma_xor1 {
+	status = "okay";
+};
+
+&xor0 {
+	status = "disabled";
+};
+
+&xor1 {
+	status = "disabled";
+};
+
+&uio_xor0 {
+	status = "disabled";
+};
+
+&uio_xor1 {
+	status = "disabled";
+};
+
+&cp0_pci_ep_uio {
+	status = "okay";
+};
+
+&cp0_pcie_ep {
+	status = "okay";
+};
+
+&cp0_armada_ep {
+	status = "okay";
+};
+
+&cp0_mdio_uio { /* uses cp0_mdio */
+	status = "okay";
+};
+
+&cp0_xmdio_uio { /* uses cp0_xmdio */
+	status = "okay";
+};

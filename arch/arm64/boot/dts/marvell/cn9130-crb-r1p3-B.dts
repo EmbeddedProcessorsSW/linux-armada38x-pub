@@ -1,0 +1,17 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Copyright (C) 2023 Marvell
+ *
+ */
+
+#include "cn9130-crb-B.dts"
+
+&cp0_spi1 {
+	pinctrl-0 = <&cp0_spi0_pins>;
+};
+
+&cp0_eth2 {
+	/* This port uses "2500base-x" phy-mode */
+	status = "okay";
+	phy-mode = "2500base-x";
+};

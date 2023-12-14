@@ -2,13 +2,14 @@
 /*
  * Copyright (C) 2023 Marvell
  *
+ * Device tree for the CN9130-CRB-A board.
  */
 
 #include "cn9130-crb.dtsi"
-
 / {
 	model = "Marvell Armada CN9130-CRB-A";
 };
+
 
 &cp0_pcie0 {
 	status = "okay";
@@ -23,17 +24,5 @@
 		<0x0   &smmu 0x480 0x20>,
 		<0x100 &smmu 0x4a0 0x20>,
 		<0x200 &smmu 0x4c0 0x20>;
-	iommu-map-mask = <0x031f>;
-};
-
-&cp0_usb3_0 {
-	status = "okay";
-	usb-phy = <&cp0_usb3_0_phy0>;
-	phy-names = "usb";
-};
-
-&cp0_usb3_1 {
-	status = "okay";
-	usb-phy = <&cp0_usb3_0_phy1>;
-	phy-names = "usb";
+		iommu-map-mask = <0x031f>;
 };

@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+// SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2019 Marvell International Ltd.
+ * Copyright (C) 2023 Marvell
  *
  * Device tree for the CN9130 SoC.
  */
@@ -25,6 +25,7 @@
  */
 
 #define CP11X_NAME		cp0
+#define CP11X_NUM		0
 #define CP11X_BASE		f2000000
 #define CP11X_PCIEx_MEM_BASE(iface) ((iface == 0) ? 0xc0000000 : \
 						    0xe0000000 + ((iface - 1) * 0x1000000))
@@ -36,12 +37,35 @@
 #include "armada-cp115.dtsi"
 
 #undef CP11X_NAME
+#undef CP11X_NUM
 #undef CP11X_BASE
 #undef CP11X_PCIEx_MEM_BASE
 #undef CP11X_PCIEx_MEM_SIZE
 #undef CP11X_PCIE0_BASE
 #undef CP11X_PCIE1_BASE
 #undef CP11X_PCIE2_BASE
+
+
+&smmu {
+	status = "okay";
+};
+
+&cp0_sata0 {
+	iommus = <&smmu 0x444>;
+};
+
+&cp0_sdhci0 {
+	iommus = <&smmu 0x445>;
+};
+
+&cp0_usb3_0 {
+	iommus = <&smmu 0x440>;
+};
+
+&cp0_usb3_1 {
+	iommus = <&smmu 0x441>;
+};
+
 
 &cp0_gpio1 {
 	status = "okay";

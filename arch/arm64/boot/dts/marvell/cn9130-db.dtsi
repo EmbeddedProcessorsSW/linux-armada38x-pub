@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+// SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2019 Marvell International Ltd.
+ * Copyright (C) 2023 Marvell
  *
  * Device tree for the CN9130-DB board.
  */
@@ -90,10 +90,10 @@
 	cp0_sfp_eth0: sfp-eth@0 {
 		compatible = "sff,sfp";
 		i2c-bus = <&cp0_sfpp0_i2c>;
-		los-gpios = <&cp0_module_expander1 11 GPIO_ACTIVE_HIGH>;
-		mod-def0-gpios = <&cp0_module_expander1 10 GPIO_ACTIVE_LOW>;
-		tx-disable-gpios = <&cp0_module_expander1 9 GPIO_ACTIVE_HIGH>;
-		tx-fault-gpios = <&cp0_module_expander1 8 GPIO_ACTIVE_HIGH>;
+		los-gpio = <&cp0_module_expander1 11 GPIO_ACTIVE_HIGH>;
+		mod-def0-gpio = <&cp0_module_expander1 10 GPIO_ACTIVE_LOW>;
+		tx-disable-gpio = <&cp0_module_expander1 9 GPIO_ACTIVE_HIGH>;
+		tx-fault-gpio = <&cp0_module_expander1 8 GPIO_ACTIVE_HIGH>;
 		/*
 		 * SFP cages are unconnected on early PCBs because of an the I2C
 		 * lanes not being connected. Prevent the port for being
@@ -277,6 +277,11 @@
 		&cp0_comphy1 0
 		&cp0_comphy2 0
 		&cp0_comphy3 0>;
+	iommu-map =
+		<0x0   &smmu 0x480 0x20>,
+		<0x100 &smmu 0x4a0 0x20>,
+		<0x200 &smmu 0x4c0 0x20>;
+		iommu-map-mask = <0x031f>;
 };
 
 &cp0_sata0 {
@@ -307,10 +312,10 @@
 &cp0_spi1 {
 	status = "disabled";
 	pinctrl-names = "default";
-	pinctrl-0 = <&cp0_spi1_pins>;
+	pinctrl-0 = <&cp0_spi0_pins>;
 	reg = <0x700680 0x50>;
 
-	flash@0 {
+	spi-flash@0 {
 		#address-cells = <0x1>;
 		#size-cells = <0x1>;
 		compatible = "jedec,spi-nor";
@@ -371,7 +376,7 @@
 				       "mpp59", "mpp60", "mpp61";
 			marvell,function = "sdio";
 		};
-		cp0_spi1_pins: cp0-spi-pins-1 {
+		cp0_spi0_pins: cp0-spi-pins-0 {
 			marvell,pins = "mpp13", "mpp14", "mpp15", "mpp16";
 			marvell,function = "spi1";
 		};
@@ -404,7 +409,7 @@
 &cp0_usb3_1 {
 	status = "okay";
 	usb-phy = <&cp0_usb3_0_phy1>;
-	phys = <&cp0_utmi1>;
+	phys =  <&cp0_utmi1>;
 	phy-names = "utmi";
 	dr_mode = "host";
 };

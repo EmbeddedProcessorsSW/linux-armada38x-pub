@@ -1,6 +1,7 @@
-// SPDX-License-Identifier: GPL-2.0+
+// SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2020 Marvell International Ltd.
+ * Copyright (C) 2023 Marvell
+ *
  */
 
 #include "cn9130.dtsi" /* include SoC device tree */
@@ -17,8 +18,6 @@
 		ethernet0 = &cp0_eth0;
 		ethernet1 = &cp0_eth1;
 		ethernet2 = &cp0_eth2;
-		gpio1 = &cp0_gpio1;
-		gpio2 = &cp0_gpio2;
 	};
 
 	memory@0 {
@@ -120,19 +119,11 @@
 				       "mpp59", "mpp60", "mpp61";
 			marvell,function = "sdio";
 		};
-		cp0_spi1_pins: cp0-spi-pins-1 {
+		cp0_spi0_pins: cp0-spi-pins-0 {
 			marvell,pins = "mpp13", "mpp14", "mpp15", "mpp16";
 			marvell,function = "spi1";
 		};
 	};
-};
-
-&cp0_gpio1 {
-	status = "okay";
-};
-
-&cp0_gpio2 {
-	status = "okay";
 };
 
 &cp0_i2c0 {
@@ -170,12 +161,12 @@
 
 &cp0_spi1 {
 	pinctrl-names = "default";
-	pinctrl-0 = <&cp0_spi1_pins>;
+	pinctrl-0 = <&cp0_spi0_pins>;
 	reg = <0x700680 0x50>,		/* control */
 	      <0x2000000 0x1000000>;	/* CS0 */
 	status = "okay";
 
-	flash@0 {
+	spi-flash@0 {
 		#address-cells = <0x1>;
 		#size-cells = <0x1>;
 		compatible = "jedec,spi-nor";
@@ -206,7 +197,6 @@
 	phy0: ethernet-phy@0 {
 		reg = <0>;
 	};
-
 	switch6: switch0@6 {
 		/* Actual device is MV88E6393X */
 		compatible = "marvell,mv88e6190";
@@ -226,55 +216,55 @@
 
 			port@1 {
 				reg = <1>;
-				label = "p1";
+				label = "wan1";
 				phy-handle = <&switch0phy1>;
 			};
 
 			port@2 {
 				reg = <2>;
-				label = "p2";
+				label = "lan2";
 				phy-handle = <&switch0phy2>;
 			};
 
 			port@3 {
 				reg = <3>;
-				label = "p3";
+				label = "lan3";
 				phy-handle = <&switch0phy3>;
 			};
 
 			port@4 {
 				reg = <4>;
-				label = "p4";
+				label = "lan4";
 				phy-handle = <&switch0phy4>;
 			};
 
 			port@5 {
 				reg = <5>;
-				label = "p5";
+				label = "lan5";
 				phy-handle = <&switch0phy5>;
 			};
 
 			port@6 {
 				reg = <6>;
-				label = "p6";
+				label = "lan6";
 				phy-handle = <&switch0phy6>;
 			};
 
 			port@7 {
 				reg = <7>;
-				label = "p7";
+				label = "lan7";
 				phy-handle = <&switch0phy7>;
 			};
 
 			port@8 {
 				reg = <8>;
-				label = "p8";
+				label = "lan8";
 				phy-handle = <&switch0phy8>;
 			};
 
 			port@9 {
 				reg = <9>;
-				label = "p9";
+				label = "wanp9";
 				phy-mode = "10gbase-r";
 				sfp = <&sfp>;
 				managed = "in-band-status";
@@ -284,6 +274,8 @@
 				reg = <10>;
 				label = "cpu";
 				ethernet = <&cp0_eth0>;
+				phy-mode = "10gbase-r";
+				managed = "in-band-status";
 			};
 
 		};
