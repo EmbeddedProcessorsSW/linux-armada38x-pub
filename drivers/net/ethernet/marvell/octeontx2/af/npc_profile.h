@@ -11267,7 +11267,7 @@ static struct npc_kpu_profile_action kpu4_action_entries[] = {
 	{
 		NPC_ERRLEV_RE, NPC_EC_NOERR,
 		8, 0, 6, 0, 0,
-		NPC_S_KPU5_IP, 10, 0,
+		NPC_S_KPU5_IP, 10, 1,
 		NPC_LID_LB, NPC_LT_LB_PPPOE,
 		0,
 		0, 0, 0, 0,
@@ -11275,7 +11275,7 @@ static struct npc_kpu_profile_action kpu4_action_entries[] = {
 	{
 		NPC_ERRLEV_RE, NPC_EC_NOERR,
 		6, 0, 42, 0, 0,
-		NPC_S_KPU5_IP6, 10, 0,
+		NPC_S_KPU5_IP6, 10, 1,
 		NPC_LID_LB, NPC_LT_LB_PPPOE,
 		0,
 		0, 0, 0, 0,
