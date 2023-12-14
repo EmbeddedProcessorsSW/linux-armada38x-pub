@@ -186,14 +186,4 @@ config PTP_1588_CLOCK_OCP
 
 	  More information is available at http://www.timingcard.com/
 
-config PTP_1588_CLOCK_OCTEON
-	tristate "OCTEON PTM PTP clock"
-	depends on PTP_1588_CLOCK
-	default y
-	help
-	  This driver adds support for using Octeon PTM device clock as
-	  a PTP clock.
-
-	  To compile this driver as a module, choose M here: the module
-	  will be called ptp_octeon_ptm.
 endmenu
