@@ -12206,6 +12206,12 @@ M:	Piyush Malgujar <pmalgujar@marvell.com>
 S:	Maintained
 F:	drivers/mailbox/mvl_mhu.c
 
+MAILBOX MARVELL MUB DRIVER
+M:	Wojciech Bartczak <wbartczak@marvell.com>
+M:	Piyush Malgujar <pmalgujar@marvell.com>
+S:	Maintained
+F:	drivers/firmware/octeontx2/mub.c
+
 MAN-PAGES: MANUAL PAGES FOR LINUX -- Sections 2, 3, 4, 5, and 7
 M:	Michael Kerrisk <mtk.manpages@gmail.com>
 L:	linux-man@vger.kernel.org

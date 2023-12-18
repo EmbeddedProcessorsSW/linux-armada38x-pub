@@ -38,3 +38,4 @@ obj-y				+= psci/
 obj-y				+= smccc/
 obj-y				+= tegra/
 obj-y				+= xilinx/
+obj-$(CONFIG_MARVELL_UB)        += octeontx2/
