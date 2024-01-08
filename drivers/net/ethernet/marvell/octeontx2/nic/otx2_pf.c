@@ -3202,6 +3202,7 @@ static void otx2_vf_link_event_task(struct work_struct *work)
 	struct otx2_vf_config *config;
 	struct cgx_link_info_msg *req;
 	struct mbox_msghdr *msghdr;
+	struct delayed_work *dwork;
 	struct otx2_nic *pf;
 	int vf_idx;
 
@@ -3214,6 +3215,14 @@ static void otx2_vf_link_event_task(struct work_struct *work)
 		return;
 
 	mutex_lock(&pf->mbox.lock);
+
+	dwork = &config->link_event_work;
+
+	if (!otx2_mbox_wait_for_zero(&pf->mbox_pfvf[0].mbox_up, vf_idx)) {
+		schedule_delayed_work(dwork, msecs_to_jiffies(100));
+		mutex_unlock(&pf->mbox.lock);
+		return;
+	}
 
 	msghdr = otx2_mbox_alloc_msg_rsp(&pf->mbox_pfvf[0].mbox_up, vf_idx,
 					 sizeof(*req), sizeof(struct msg_rsp));
