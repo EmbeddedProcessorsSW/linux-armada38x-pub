@@ -1,0 +1,84 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/edac/marvell,sdei-ghes.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Marvell EDAC driver
+
+description: |
+  This driver uses the EDAC framework to implement the
+  Marvell OcteonTX2/CN10K (CN10K) SoC EDAC driver.
+  Counts and corrects single-bit errors and counts
+  double-bit errors, which are uncorrectable.
+  Driver handle SECDED notification from SDEI call
+  after firmware first GHES interrupt handling.
+
+  Marvell OcteonTX2/CN10K SOC sdei-ghes node
+  It is defined to describe GHES resources for SECDED.
+
+  The following error sources are supported:
+
+  MDC     - OcteonTX2/CN10K Memory Diagnostic Controller
+  MCC     - OcteonTX2 Memory Common Controller
+  DSS     - CN10K DDR5 Memory Controller
+  TAD     - CN10K Cache Memory Controller
+  CORE[i] - CN10K ARM core processors
+
+properties:
+
+  compatible:
+    const: marvell,sdei-ghes
+
+  reg:
+    maxItems: 3
+
+  "#address-cells":
+    const: 2
+
+  "#size-cells":
+    const: 1
+
+  event-id:
+    description: SDEI event ID for receiving firmware notifications
+
+required:
+  - compatible
+  - reg
+  - "#address-cells"
+  - "#size-cells"
+  - event-id
+
+examples:
+  - |
+    sdei-ghes {
+        compatible = "marvell,sdei-ghes";
+        #address-cells = <2>;
+        #size-cells = <1>;
+        memory-region = <&ghes_hest_reserved>;
+        /*
+         * Range placeholders; the addrs are set dynamically by
+         * firmware to match 'reg' in 'ghes_hest_reserved'.
+         */
+        ranges = <0x0 0x00000000 0x0 0x0 0x00100>,
+                 <0x0 0x00000100 0x0 0x0 0x00700>,
+                 <0x0 0x00000800 0x0 0x0 0x08000>;
+        mdc {
+                reg = <0x0 0x00000000 0x008>,
+                      <0x0 0x00000100 0x9D>,
+                      <0x0 0x00000800 0x800>;
+                event-id = <0x40000000>;
+        };
+        mcc {
+                reg = <0x0 0x00000008 0x008>,
+                      <0x0 0x00000200 0x9D>,
+                      <0x0 0x00001000 0x800>;
+                event-id = <0x40000001>;
+        };
+        lmc {
+                reg = <0x0 0x00000010 0x008>,
+                      <0x0 0x00000300 0x9D>,
+                      <0x0 0x00001800 0x800>;
+                event-id = <0x40000002>;
+        };
+    };
