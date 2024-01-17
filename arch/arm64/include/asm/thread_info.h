@@ -115,7 +115,7 @@ int arch_dup_task_struct(struct task_struct *dst,
 
 #define _TIF_SYSCALL_WORK	(_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT | \
 				 _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP | \
-				 _TIF_SYSCALL_EMU)
+				 _TIF_NOHZ | _TIF_SYSCALL_EMU)
 
 #ifdef CONFIG_SHADOW_CALL_STACK
 #define INIT_SCS							\
