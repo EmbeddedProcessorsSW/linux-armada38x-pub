@@ -37,6 +37,17 @@ config MARVELL_PORTM_BOOT_CFG
 	  Currently, only cn10k platforms are supported.
 	  If unsure, say N here.
 
+config MARVELL_LED_BLINK_RATE
+	bool "Marvell direct connect GPIO network activity LED blink rate"
+	depends on HAVE_ARM_SMCCC
+	select MARVELL_UB_GEN_DRIVER
+	default n
+	help
+	  Enable sysfs interface for configuring the network activity
+	  blink rate for LEDs that are directly connected to the
+	  Octeon processor.  Currently, only cn10k platforms are supported.
+	  If unsure, say N here.
+
 config MARVELL_RETIMER_MGMT
 	bool "Marvell Retimer mgmt interface"
 	depends on HAVE_ARM_SMCCC
