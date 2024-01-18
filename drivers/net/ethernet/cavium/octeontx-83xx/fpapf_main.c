@@ -685,7 +685,7 @@ struct fpapf_com_s fpapf_com = {
 	.receive_message = fpa_pf_receive_message,
 	.get_vf_count = fpa_pf_get_vf_count,
 };
-EXPORT_SYMBOL(fpapf_com);
+EXPORT_SYMBOL_GPL(fpapf_com);
 
 static irqreturn_t fpa_pf_ecc_intr_handler (int irq, void *fpa_irq)
 {

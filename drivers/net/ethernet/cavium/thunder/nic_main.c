@@ -203,7 +203,7 @@ struct thunder_lbk_com_s thunder_lbk_com = {
 	.port_stop = nic_stop_lbk_port,
 	.get_port_pkind = nic_get_lbk_port_pkind
 };
-EXPORT_SYMBOL(thunder_lbk_com);
+EXPORT_SYMBOL_GPL(thunder_lbk_com);
 
 static void nic_lbk_link_update(struct nicpf *nic, int vf_idx)
 {

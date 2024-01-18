@@ -433,7 +433,7 @@ struct fpavf_com_s fpavf_com = {
 	.teardown = fpa_vf_teardown,
 	.put = fpa_vf_put,
 };
-EXPORT_SYMBOL(fpavf_com);
+EXPORT_SYMBOL_GPL(fpavf_com);
 
 static irqreturn_t fpa_vf_intr_handler (int irq, void *fpa_irq)
 {

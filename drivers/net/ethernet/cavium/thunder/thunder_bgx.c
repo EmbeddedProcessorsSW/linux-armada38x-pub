@@ -332,7 +332,7 @@ struct thunder_bgx_com_s thunder_bgx_com = {
 	.switch_ctx = bgx_switch_ctx,
 	.change_mode = bgx_change_lmac_mode,
 };
-EXPORT_SYMBOL(thunder_bgx_com);
+EXPORT_SYMBOL_GPL(thunder_bgx_com);
 
 static void bgx_flush_dmac_cam_filter(struct bgx *bgx, int lmacid)
 {

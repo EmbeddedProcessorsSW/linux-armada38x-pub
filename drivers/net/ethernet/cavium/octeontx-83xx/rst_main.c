@@ -105,7 +105,7 @@ struct rst_com_s rst_com = {
 	.get_sclk_freq = rst_get_sclk_freq,
 	.get_rclk_freq = rst_get_rclk_freq
 };
-EXPORT_SYMBOL(rst_com);
+EXPORT_SYMBOL_GPL(rst_com);
 
 static int rst_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
