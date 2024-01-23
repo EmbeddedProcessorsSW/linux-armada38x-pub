@@ -37,4 +37,16 @@ config MARVELL_PORTM_BOOT_CFG
 	  Currently, only cn10k platforms are supported.
 	  If unsure, say N here.
 
+config MARVELL_CN10K_RPRAM
+	tristate "Octeontx RPRAM configuration interface"
+	depends on HAVE_ARM_SMCCC
+	select MARVELL_UB_GEN_DRIVER
+	default n
+	help
+	  The module enables configuration interface for the persistent data
+	  memory region. The interface allows to control the size of the region.
+	  The new value is used after platform reboot.
+	  Only Octeon 10x platform are supported by this module.
+	  If unsure, say N here.
+
 endif # MARVELL_UB
