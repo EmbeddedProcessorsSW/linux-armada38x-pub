@@ -75,4 +75,15 @@ config MARVELL_MEMTEST
 	  at warm and cold boot.
 	  If unsure, say N here.
 
+config MARVELL_CN10K_MAC_MGMT
+	tristate "CN10K MAC management interface"
+	default n
+	depends on HAVE_ARM_SMCCC
+	select MARVELL_UB_GEN_DRIVER
+	help
+	  The module provides an interface to change MAC addresses assigned
+	  to the network devices.
+	  Driver is supported only for CN10K platform.
+	  If unsure, say N here.
+
 endif # MARVELL_UB
