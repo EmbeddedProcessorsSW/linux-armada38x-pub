@@ -1226,6 +1226,9 @@ void rvu_switch_enable(struct rvu *rvu);
 void rvu_switch_disable(struct rvu *rvu);
 void rvu_switch_update_rules(struct rvu *rvu, u16 pcifunc, bool ena);
 
+/* RVU REP */
+int rvu_rep_notify_representee_state(struct rvu *rvu, u16 pcifunc, bool enable);
+
 int rvu_npc_set_parse_mode(struct rvu *rvu, u16 pcifunc, u64 mode, u8 dir,
 			   u64 pkind, u8 var_len_off, u8 var_len_off_mask,
 			   u8 shift_dir);

@@ -447,7 +447,8 @@ M(CPT_INST_LMTST,	0xD00, cpt_inst_lmtst, cpt_inst_lmtst_req, msg_rsp)
 M(MCS_INTR_NOTIFY,	0xE00, mcs_intr_notify, mcs_intr_info, msg_rsp)
 
 #define MBOX_UP_REP_MESSAGES						\
-M(REP_STATE_EVENT,	0xEF0, rep_state_event, rep_state, msg_rsp)
+M(REP_STATE_EVENT,	0xEF0, rep_state_event, rep_state, msg_rsp)	\
+M(REP_REPTE_NOTIFY,	0xEF1, rep_repte_notify, rep_repte_req, msg_rsp)
 
 enum {
 #define M(_name, _id, _1, _2, _3) MBOX_MSG_ ## _name = _id,
@@ -2797,6 +2798,12 @@ struct mcs_intr_info {
 	u8 mcs_id;
 	u8 lmac_id;
 	u64 rsvd;
+};
+
+struct rep_repte_req {
+	struct mbox_msghdr hdr;
+	u16 repte_pcifunc;
+	bool enable;
 };
 
 #endif /* MBOX_H */

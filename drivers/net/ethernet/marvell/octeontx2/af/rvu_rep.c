@@ -32,6 +32,31 @@ static struct _req_type __maybe_unused					\
 MBOX_UP_REP_MESSAGES
 #undef M
 
+int rvu_rep_notify_representee_state(struct rvu *rvu, u16 pcifunc, bool enable)
+{
+	struct rep_repte_req *req;
+	int pf;
+
+	if (!is_pf_cgxmapped(rvu, rvu_get_pf(pcifunc)))
+		return 0;
+
+	pf = rvu_get_pf(rvu->rep_pcifunc);
+
+	req = otx2_mbox_alloc_msg_rep_repte_notify(rvu, pf);
+	if (!req)
+		return -ENOMEM;
+
+	req->hdr.pcifunc = rvu->rep_pcifunc;
+	req->enable = enable;
+	req->repte_pcifunc = pcifunc;
+
+	otx2_mbox_wait_for_zero(&rvu->afpf_wq_info.mbox_up, pf);
+
+	otx2_mbox_msg_send_up(&rvu->afpf_wq_info.mbox_up, pf);
+
+	return 0;
+}
+
 static int rvu_rep_notify_vf(struct rvu *rvu, struct rep_event *event)
 {
 	struct rep_state *msg;

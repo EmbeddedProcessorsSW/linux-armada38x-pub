@@ -389,6 +389,8 @@ static int nix_interface_init(struct rvu *rvu, u16 pcifunc, int type, int nixlf,
 				      pkind);
 			rvu_npc_set_pkind(rvu, pkind, pfvf);
 		}
+		/* Notify RVU REP PF about representee coming up */
+		rvu_rep_notify_representee_state(rvu, pcifunc, true);
 
 		break;
 	case NIX_INTF_TYPE_LBK:
@@ -526,6 +528,8 @@ static void nix_interface_deinit(struct rvu *rvu, u16 pcifunc, u8 nixlf)
 
 	/* Disable DMAC filters used */
 	rvu_cgx_disable_dmac_entries(rvu, pcifunc);
+	/* Notify RVU REP PF about representee going down */
+	rvu_rep_notify_representee_state(rvu, pcifunc, false);
 }
 
 #define NIX_BPIDS_PER_LMAC	8
