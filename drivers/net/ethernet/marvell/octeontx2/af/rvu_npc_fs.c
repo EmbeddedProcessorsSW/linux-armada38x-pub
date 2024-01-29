@@ -557,10 +557,9 @@ do {									       \
 	NPC_SCAN_HDR(NPC_IPSEC_SPI, NPC_LID_LD, NPC_LT_LD_AH, 4, 4);
 	NPC_SCAN_HDR(NPC_IPSEC_SPI, NPC_LID_LE, NPC_LT_LE_ESP, 0, 4);
 
-	/* SMAC follows the DMAC(which is 6 bytes) */
-	NPC_SCAN_HDR(NPC_SMAC, NPC_LID_LA, la_ltype, la_start + 6, 6);
 	/* PF_FUNC is 2 bytes at 0th byte of NPC_LT_LA_IH_NIX_ETHER */
 	NPC_SCAN_HDR(NPC_PF_FUNC, NPC_LID_LA, NPC_LT_LA_IH_NIX_ETHER, 0, 2);
+	NPC_SCAN_HDR(NPC_SQ_ID, NPC_LID_LA, NPC_LT_LA_IH_NIX_ETHER, 2, 3);
 }
 
 static void npc_set_features(struct rvu *rvu, int blkaddr, u8 intf)
@@ -838,6 +837,10 @@ void npc_update_entry(struct rvu *rvu, enum key_fields type,
 
 		entry->kw[i] |= dummy.kw[i];
 		entry->kw_mask[i] |= dummy.kw_mask[i];
+		if (type == NPC_SQ_ID) {
+			entry->kw[i] = entry->kw[i] << 8;
+			entry->kw_mask[i] = entry->kw_mask[i] << 8;
+		}
 	}
 }
 
@@ -1212,14 +1215,11 @@ static int npc_update_tx_entry(struct rvu *rvu, struct rvu_pfvf *pfvf,
 	u64 mask = ~0ULL;
 	int mce_index;
 
-	/* If AF is installing then do not care about
-	 * PF_FUNC in Send Descriptor
-	 */
-	if (is_pffunc_af(req->hdr.pcifunc))
-		mask = 0;
-
 	npc_update_entry(rvu, NPC_PF_FUNC, entry, (__force u16)htons(target),
 			 0, mask, 0, NIX_INTF_TX);
+
+	npc_update_entry(rvu, NPC_SQ_ID, entry, (__force u16)htonl(req->packet.sq_id),
+			 0, req->mask.sq_id, 0, NIX_INTF_TX);
 
 	*(u64 *)&action = 0x00;
 	action.op = req->op;
@@ -1404,6 +1404,14 @@ find_rule:
 	    req->vtag0_type == NIX_AF_LFX_RX_VTAG_TYPE7)
 		rule->vfvlan_cfg = true;
 
+	/* Scenario where representor installing rule for PFVF and respective
+	 * PFVF NIX LF is started, updating switch rules only once.
+	 */
+	if (is_rep_dev(rvu, req->hdr.pcifunc) &&
+	    test_bit(NIXLF_INITIALIZED, &pfvf->flags) &&
+	    pfvf->esw_rules == 1)
+		rvu_switch_update_rules(rvu, req->vf, true);
+
 	if (is_npc_intf_rx(req->intf) && req->match_id &&
 	    (req->op == NIX_RX_ACTIONOP_UCAST || req->op == NIX_RX_ACTIONOP_RSS))
 		return rvu_nix_setup_ratelimit_aggr(rvu, req->hdr.pcifunc,
@@ -1421,6 +1429,7 @@ int rvu_mbox_handler_npc_install_flow(struct rvu *rvu,
 				      struct npc_install_flow_rsp *rsp)
 {
 	bool from_vf = !!(req->hdr.pcifunc & RVU_PFVF_FUNC_MASK);
+	bool from_rep_dev = !!is_rep_dev(rvu, req->hdr.pcifunc);
 	struct rvu_switch *rswitch = &rvu->rswitch;
 	int blkaddr, nixlf, err;
 	struct rvu_pfvf *pfvf;
@@ -1477,12 +1486,17 @@ process_flow:
 	/* AF installing for a PF/VF */
 	if (!req->hdr.pcifunc)
 		target = req->vf;
+
 	/* PF installing for its VF */
-	else if (!from_vf && req->vf) {
+	else if (!from_vf && req->vf && !from_rep_dev) {
 		target = (req->hdr.pcifunc & ~RVU_PFVF_FUNC_MASK) | req->vf;
 		pf_set_vfs_mac = req->default_rule &&
 				(req->features & BIT_ULL(NPC_DMAC));
 	}
+	/* Representor device installing for a representee */
+	else if (from_rep_dev && req->vf)
+		target = req->vf;
+
 	/* msg received from PF/VF */
 	else
 		target = req->hdr.pcifunc;
@@ -1498,8 +1512,12 @@ process_flow:
 	pfvf = rvu_get_pfvf(rvu, target);
 
 	/* PF installing for its VF */
-	if (req->hdr.pcifunc && !from_vf && req->vf)
+	if (req->hdr.pcifunc && !from_vf && req->vf && !from_rep_dev)
 		set_bit(PF_SET_VF_CFG, &pfvf->flags);
+
+	/* Representor installing for PFVF */
+	if (from_rep_dev)
+		pfvf->esw_rules++;
 
 	/* update req destination mac addr */
 	if ((req->features & BIT_ULL(NPC_DMAC)) && is_npc_intf_rx(req->intf) &&
@@ -1574,6 +1592,7 @@ int rvu_mbox_handler_npc_delete_flow(struct rvu *rvu,
 	struct rvu_npc_mcam_rule *iter, *tmp;
 	u16 pcifunc = req->hdr.pcifunc;
 	struct list_head del_list;
+	struct rvu_pfvf *pfvf;
 	int blkaddr;
 
 	INIT_LIST_HEAD(&del_list);
@@ -1610,6 +1629,11 @@ int rvu_mbox_handler_npc_delete_flow(struct rvu *rvu,
 			dev_err(rvu->dev, "rule deletion failed for entry:%u",
 				entry);
 	}
+
+	/* In case of representor installing for PF/VF clear esw rule count */
+	pfvf = rvu_get_pfvf(rvu, req->vf);
+	if (is_rep_dev(rvu, req->hdr.pcifunc) && pfvf->esw_rules)
+		pfvf->esw_rules--;
 
 	return 0;
 }
