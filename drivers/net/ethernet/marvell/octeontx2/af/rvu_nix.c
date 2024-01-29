@@ -4856,6 +4856,7 @@ int rvu_mbox_handler_nix_set_hw_frs(struct rvu *rvu, struct nix_frs_cfg *req,
 	struct rvu_pfvf *pfvf;
 	u8 cgx = 0, lmac = 0;
 	u16 max_mtu;
+	u16 rep_id;
 	u64 cfg;
 
 	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NIX, pcifunc);
@@ -4890,6 +4891,9 @@ int rvu_mbox_handler_nix_set_hw_frs(struct rvu *rvu, struct nix_frs_cfg *req,
 		/* Get CGX and LMAC to which this PF is mapped and find link */
 		rvu_get_cgx_lmac_id(rvu->pf2cgxlmac_map[pf], &cgx, &lmac);
 		link = (cgx * hw->lmac_per_cgx) + lmac;
+		if (is_mapped_to_rep(rvu, pcifunc, &rep_id)) {
+			rvu_rep_mtu_event_notify(rvu, req->minlen, pcifunc, rep_id);
+		}
 	} else if (pf == 0) {
 		/* For VFs of PF0 ingress is LBK port, so config LBK link */
 		pfvf = rvu_get_pfvf(rvu, pcifunc);

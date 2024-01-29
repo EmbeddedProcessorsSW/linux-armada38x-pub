@@ -448,7 +448,8 @@ M(MCS_INTR_NOTIFY,	0xE00, mcs_intr_notify, mcs_intr_info, msg_rsp)
 
 #define MBOX_UP_REP_MESSAGES						\
 M(REP_STATE_EVENT,	0xEF0, rep_state_event, rep_state, msg_rsp)	\
-M(REP_REPTE_NOTIFY,	0xEF1, rep_repte_notify, rep_repte_req, msg_rsp)
+M(REP_REPTE_NOTIFY,	0xEF1, rep_repte_notify, rep_repte_req, msg_rsp) \
+M(REP_SET_MTU,		0xEF2, rep_set_mtu, rep_mtu, msg_rsp)
 
 enum {
 #define M(_name, _id, _1, _2, _3) MBOX_MSG_ ## _name = _id,
@@ -1898,6 +1899,9 @@ struct rep_event {
 	u16 pcifunc;
 #define RVU_REP_DOWN	BIT_ULL(0)
 #define RVU_REP_UP	BIT_ULL(1)
+#define RVU_REP_MTU	BIT_ULL(2)
+	u16 rep_id;
+	u16 mtu;
 	u8 flags;
 	u64 rsvd;
 };
@@ -1906,6 +1910,13 @@ struct rep_state {
 	struct mbox_msghdr hdr;
 	bool intf_up;
 	u64 rsvd;
+};
+
+struct rep_mtu {
+	struct mbox_msghdr hdr;
+	u16 pcifunc;
+	u16 rep_id;
+	u16 mtu;
 };
 
 struct flow_msg {

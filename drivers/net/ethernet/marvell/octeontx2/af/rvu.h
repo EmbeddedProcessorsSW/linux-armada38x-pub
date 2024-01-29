@@ -989,6 +989,8 @@ static inline bool is_rep_dev(struct rvu *rvu, u16 pcifunc)
 	return false;
 }
 
+bool is_mapped_to_rep(struct rvu *rvu, u16 pcifunc, u16 *rep_id);
+int rvu_rep_mtu_event_notify(struct rvu *rvu, u16 mtu, u16 pcifunc, u16 rep_id);
 /* CGX APIs */
 static inline bool is_pf_cgxmapped(struct rvu *rvu, u8 pf)
 {

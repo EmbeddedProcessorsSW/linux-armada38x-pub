@@ -81,6 +81,44 @@ static int rvu_rep_notify_vf(struct rvu *rvu, struct rep_event *event)
 	return 0;
 }
 
+bool is_mapped_to_rep(struct rvu *rvu, u16 pcifunc, u16 *rep_id)
+{
+	int id;
+
+	for (id = 0; id < rvu->rep_cnt; id++) {
+		if (rvu->rep2pfvf_map[id] == pcifunc) {
+			*rep_id = id;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static int rvu_rep_notify_mtu(struct rvu *rvu, struct rep_event *event)
+{
+	struct rep_mtu *msg;
+	int pf;
+
+	pf = rvu_get_pf(rvu->rep_pcifunc);
+
+	mutex_lock(&rvu->mbox_lock);
+	msg = otx2_mbox_alloc_msg_rep_set_mtu(rvu, pf);
+	if (!msg)
+		return -ENOMEM;
+
+	msg->hdr.pcifunc = event->pcifunc;
+	msg->rep_id = event->rep_id;
+	msg->mtu = event->mtu;
+
+	otx2_mbox_wait_for_zero(&rvu->afpf_wq_info.mbox_up, pf);
+
+	otx2_mbox_msg_send_up(&rvu->afpf_wq_info.mbox_up, pf);
+
+	mutex_unlock(&rvu->mbox_lock);
+	return 0;
+}
+
 static void rvu_rep_wq_handler(struct work_struct *work)
 {
 	struct rvu *rvu = container_of(work, struct rvu, rep_evt_work);
@@ -101,10 +139,33 @@ static void rvu_rep_wq_handler(struct work_struct *work)
 			break; /* nothing more to process */
 
 		event = &qentry->event;
+		if (event->flags == RVU_REP_MTU)
+			rvu_rep_notify_mtu(rvu, event);
+		else
+			rvu_rep_notify_vf(rvu, event);
 
-		rvu_rep_notify_vf(rvu, event);
 		kfree(qentry);
 	} while (1);
+}
+
+int rvu_rep_mtu_event_notify(struct rvu *rvu, u16 mtu, u16 pcifunc, u16 rep_id)
+{
+	struct rep_evtq_ent *qentry;
+
+	qentry = kmalloc(sizeof(*qentry), GFP_ATOMIC);
+	if (!qentry)
+		return -ENOMEM;
+
+	qentry->event.hdr.pcifunc = rvu->rep_pcifunc;
+	qentry->event.pcifunc = rvu->rep_pcifunc;
+	qentry->event.rep_id = rep_id;
+	qentry->event.mtu = mtu;
+	qentry->event.flags = RVU_REP_MTU;
+	spin_lock(&rvu->rep_evtq_lock);
+	list_add_tail(&qentry->node, &rvu->rep_evtq_head);
+	spin_unlock(&rvu->rep_evtq_lock);
+	queue_work(rvu->rep_evt_wq, &rvu->rep_evt_work);
+	return 0;
 }
 
 int rvu_mbox_handler_rep_event_notify(struct rvu *rvu, struct rep_event *req,
