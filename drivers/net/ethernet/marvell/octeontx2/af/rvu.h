@@ -901,7 +901,7 @@ static inline bool is_rvu_supports_nix1(struct rvu *rvu)
 /* Function Prototypes
  * RVU
  */
-#define	RVU_LBK_VF_DEVID	0xF8
+#define	RVU_LBK_VF_DEVID	0xA0F8
 static inline bool is_lbk_vf(struct rvu *rvu, u16 pcifunc)
 {
 	return (!(pcifunc & ~RVU_PFVF_FUNC_MASK) &&

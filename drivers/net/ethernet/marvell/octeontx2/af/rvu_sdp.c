@@ -40,7 +40,7 @@ bool is_sdp_pf(u16 pcifunc)
 		!(pcifunc & RVU_PFVF_FUNC_MASK));
 }
 
-#define	RVU_SDP_VF_DEVID	0xF7
+#define	RVU_SDP_VF_DEVID	0xA0F7
 bool is_sdp_vf(struct rvu *rvu, u16 pcifunc)
 {
 	if (!(pcifunc & ~RVU_PFVF_FUNC_MASK))
