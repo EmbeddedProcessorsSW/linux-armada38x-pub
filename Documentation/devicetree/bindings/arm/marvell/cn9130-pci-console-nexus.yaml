@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+
+title: Marvell pci console memory reservation.
+
+properties:
+  compatible: should be "marvell,pci-console-nexus-memory"
+  reg: reg address
+
+examples:
+  - |
+    reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		/* The PCI console memory must be reserved */
+		console_reserved: pci-console-nexus@3f000000 {
+			compatible = "marvell,pci-console-nexus-memory";
+			reg = <0 0x3f000000 0 0x1000000>;
+			no-map;
+		};
+	};
+
+	cp0 {
+		/delete-node/ pcie@600000;
+		/delete-node/ pcie@620000;
+		/delete-node/ pcie@640000;
+	};
+};
