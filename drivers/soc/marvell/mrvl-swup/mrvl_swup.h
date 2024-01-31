@@ -359,7 +359,6 @@ struct smc_update_descriptor_prev {
 	uint64_t	user_flags;	/** Passed to customer function */
 	uintptr_t	work_buffer;	/** Used for compressed objects */
 	uint64_t	work_buffer_size;/** Size of work buffer */
-	struct smc_update_obj_info object_retinfo[SMC_MAX_OBJECTS];
 };
 
 /* READ FLASH */
