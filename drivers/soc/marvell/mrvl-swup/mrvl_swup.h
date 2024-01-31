@@ -24,6 +24,7 @@
 #define VERSION_STRING_LENGTH   32
 #define HASH_SIZE               64
 #define VERIFY_LOG_SIZE		1024
+#define VERSION_DATA_LENGTH	32
 
 #define MARLIN_CHECK_PREDEFINED_OBJ		(1<<0)
 #define MARLIN_DEBUG					(1<<10)
@@ -156,6 +157,30 @@ enum smc_version_entry_retcode {
 	RET_DEVICE_TREE_ENTRY_ERROR = 11,
 };
 
+enum tim_object_update_retcode {
+	OBJ_UPDATE_OK = 0,
+	OBJ_UPDATE_SKIP_VERSION_MATCH = 1,
+	OBJ_UPDATE_SKIP_DATA_MATCH = 2,
+	OBJ_UPDATE_FORCED = 3,
+	OBJ_UPDATE_GROUP_FORCED = 4,
+	OBJ_UPDATE_INVALID_TIM = 128,
+	OBJ_UPDATE_INVALID_VERSION = 129,
+	/** Old flash image source hash does not match TIM */
+	OBJ_UPDATE_SRC_FLASH_HASH_FAIL = 130,
+	OBJ_UPDATE_SRC_FLASH_VERIFICATION_FAIL = 131,
+	OBJ_UPDATE_VERSION_DATA_MISSING = 132,
+};
+
+enum object_hash_type {
+	HASH_NONE = 0,
+	HASH_SHA256 = 0x20,
+	HASH_SHA3_256 = 0x23,
+	HASH_SHA384 = 0x30,
+	HASH_SHA3_384 = 0x33,
+	HASH_SHA512 = 0x40,
+	HASH_SHA3_512 = 0x43
+};
+
 struct smc_version_info_entry {
 	char name[VER_MAX_NAME_LENGTH];
 	struct tim_opaque_data_version_info version;
@@ -251,7 +276,25 @@ enum update_ret {
 };
 
 struct smc_update_obj_info {
-
+	uint8_t		tim_name[VER_MAX_NAME_LENGTH];/** TIM binary name */
+	uint8_t		object_name[VER_MAX_NAME_LENGTH];/** Object name */
+	uint8_t		old_version_data[VERSION_DATA_LENGTH];
+	uint8_t		new_version_data[VERSION_DATA_LENGTH];
+	uint8_t		object_hash[512 / 8];		/** Hash of object */
+	union {
+		uint32_t: 32;
+		enum object_hash_type hash_type;	/** Hash type */
+	};
+	union {
+		uint32_t: 32;
+		enum tim_object_update_retcode	retcode;/** Return code */
+	};
+	uint64_t	tim_address;			/** Media address of TIM */
+	uint64_t	tim_size;			/** Size of TIM in bytes */
+	uint64_t	data_address;			/** Object media address */
+	uint64_t	data_size;			/** Object size in bytes */
+	uint64_t	bytes_written;			/** Number of bytes written */
+	uint64_t	reserved[2];			/** Reserved for future growth */
 };
 
 #define UPDATE_MAGIC		0x55504454	/* UPDT */
