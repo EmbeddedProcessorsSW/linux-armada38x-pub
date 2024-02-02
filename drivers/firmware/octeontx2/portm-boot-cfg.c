@@ -134,7 +134,7 @@ enum {
 
 #define STR_MODE_ENTRY(_m) \
 [MODE_ ## _m] = #_m
-const char *str_modes[MODE_LAST] = {
+static const char *str_modes[MODE_LAST] = {
 	STR_MODE_ENTRY(DISABLED),
 	STR_MODE_ENTRY(INVALID),
 	STR_MODE_ENTRY(INACTIVE),
@@ -388,7 +388,7 @@ static ssize_t erase_store(struct device *dev, struct device_attribute *attr,
 	return count;
 }
 
-umode_t port_is_visible(struct kobject *kobj, struct attribute *a, int n)
+static umode_t port_is_visible(struct kobject *kobj, struct attribute *a, int n)
 {
 	struct device_attribute *dattr;
 	u32 num;
@@ -470,10 +470,9 @@ static int __init portm_boot_cfg_init(void)
 	struct mub_device *mdev;
 	struct arm_smccc_res res;
 
-	if (octeontx_soc_check_smc() != 2) {
-		pr_debug("Not supported\n");
+	if (octeontx_soc_check_smc() != 2)
 		return -EPERM;
-	}
+
 	arm_smccc_smc(PLAT_OCTEONTX_PORTM_MODE_BOOT_CFG, SUBCMD_INIT, 0, 0, 0, 0, 0, 0, &res);
 	if (res.a0 != SMCCC_RET_SUCCESS)
 		return -ENOMEM;
