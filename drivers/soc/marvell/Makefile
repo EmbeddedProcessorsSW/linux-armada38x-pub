@@ -3,6 +3,7 @@ obj-y		+= octeontx2-dpi/
 obj-y 		+= gti/
 obj-y		+= octeontx2-sdp/
 obj-y 		+= hw-access/
+obj-y           += octeontx2-ghes/
 obj-y		+= octeontx2-serdes/
 obj-$(CONFIG_MRVL_SWUP) += mrvl-swup/
 obj-$(CONFIG_MARVELL_FWLOG) += fwlog.o
