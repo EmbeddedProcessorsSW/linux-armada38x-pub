@@ -5,6 +5,7 @@
  */
 
 #include <linux/pci.h>
+#include <soc/marvell/octeontx/octeontx_smc.h>
 
 #define PCI_DEVICE_ID_OCTEONTX2_LMC	(0xa022)
 #define PCI_DEVICE_ID_OCTEONTX2_MCC	(0xa070)
@@ -45,6 +46,9 @@ static int __init otx2_msix_init(void)
 	const struct pci_device_id *pdevid;
 	struct pci_dev *pdev;
 	size_t i;
+
+	if (!is_soc_cn9x())
+		return -ENODEV;
 
 	for (i = 0; i < ARRAY_SIZE(otx2_pci_tbl); i++) {
 		pdevid = &otx2_pci_tbl[i];
