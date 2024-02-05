@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+%YAML 1.2
+
+title: Marvell BERT driver
+
+description: |
+  bert driver for CN9x SoC for RAS fatal
+  error report via preserved memory region
+
+properties:
+
+  compatible:
+    const: marvell,bed-bert
+
+  reg:
+    maxItems: 3
+
+  "#address-cells":
+    const: 2
+
+  "#size-cells":
+    const: 2
+
+examples:
+  - |
+    bed-bert {
+       compatible = "marvell,bed-bert";
+       #address-cells = <2>;
+       #size-cells = <2>;
+       memory-region = <&ghes_bert_reserved>;
+       /*
+        * Range placeholders; these are set dynamically by
+        * firmware to match 'reg' in 'ghes_bert_reserved'.
+        */
+       ranges = <0x0 0x0 0x0 0x0 0x0 0x0>,
+                <0x0 0x0 0x0 0x0 0x0 0x0>,
+                <0x0 0x0 0x0 0x0 0x0 0x0>;
+       bert {
+             reg = <0x0 0x00000000 0x0 0x600>,
+                   <0x0 0x00000600 0x0 0x100>,
+                   <0x0 0x00000700 0x0 0x300>;
+            };
+    };
