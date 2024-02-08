@@ -390,6 +390,7 @@ void rvu_eblock_module_init(void)
 	 * module goes here.
 	 */
 	ree_eb_module_init();
+	ml_eb_module_init();
 }
 
 void rvu_eblock_module_exit(void)
@@ -399,4 +400,5 @@ void rvu_eblock_module_exit(void)
 	 * module goes here.
 	 */
 	ree_eb_module_exit();
+	ml_eb_module_exit();
 }
