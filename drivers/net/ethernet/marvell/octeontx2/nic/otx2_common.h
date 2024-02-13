@@ -1159,4 +1159,5 @@ u16 otx2_select_queue(struct net_device *netdev, struct sk_buff *skb,
 int otx2_get_txq_by_classid(struct otx2_nic *pfvf, u16 classid);
 void otx2_qos_config_txschq(struct otx2_nic *pfvf);
 void otx2_clean_qos_queues(struct otx2_nic *pfvf);
+bool otx2_is_qos_configured(struct otx2_nic *pfvf);
 #endif /* OTX2_COMMON_H */
