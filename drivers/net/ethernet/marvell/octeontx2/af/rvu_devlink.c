@@ -1382,8 +1382,8 @@ enum rvu_af_dl_param_id {
 	RVU_AF_DEVLINK_PARAM_ID_TIM_ADJUST_GTI,
 	RVU_AF_DEVLINK_PARAM_ID_TIM_ADJUST_PTP,
 	RVU_AF_DEVLINK_PARAM_ID_TIM_ADJUST_BTS,
-	RVU_AF_DEVLINK_PARAM_ID_NPC_EXACT_FEATURE_DISABLE,
 	RVU_AF_DEVLINK_PARAM_ID_NPC_MCAM_ZONE_PERCENT,
+	RVU_AF_DEVLINK_PARAM_ID_NPC_EXACT_FEATURE_DISABLE,
 	RVU_AF_DEVLINK_PARAM_ID_NIX_MAXLF,
 };
 
@@ -1927,6 +1927,12 @@ static const struct devlink_param rvu_af_dl_params[] = {
 			     rvu_af_dl_tim_adjust_timer_get,
 			     rvu_af_dl_tim_adjust_timer_set,
 			     rvu_af_dl_tim_adjust_timer_validate),
+	DEVLINK_PARAM_DRIVER(RVU_AF_DEVLINK_PARAM_ID_NPC_MCAM_ZONE_PERCENT,
+			     "npc_mcam_high_zone_percent", DEVLINK_PARAM_TYPE_U8,
+			     BIT(DEVLINK_PARAM_CMODE_RUNTIME),
+			     rvu_af_dl_npc_mcam_high_zone_percent_get,
+			     rvu_af_dl_npc_mcam_high_zone_percent_set,
+			     rvu_af_dl_npc_mcam_high_zone_percent_validate),
 	DEVLINK_PARAM_DRIVER(RVU_AF_DEVLINK_PARAM_ID_NIX_MAXLF,
 			     "nix_maxlf", DEVLINK_PARAM_TYPE_U16,
 			     BIT(DEVLINK_PARAM_CMODE_RUNTIME),
@@ -1942,12 +1948,6 @@ static const struct devlink_param rvu_af_dl_param_exact_match[] = {
 			     rvu_af_npc_exact_feature_get,
 			     rvu_af_npc_exact_feature_disable,
 			     rvu_af_npc_exact_feature_validate),
-	DEVLINK_PARAM_DRIVER(RVU_AF_DEVLINK_PARAM_ID_NPC_MCAM_ZONE_PERCENT,
-			     "npc_mcam_high_zone_percent", DEVLINK_PARAM_TYPE_U8,
-			     BIT(DEVLINK_PARAM_CMODE_RUNTIME),
-			     rvu_af_dl_npc_mcam_high_zone_percent_get,
-			     rvu_af_dl_npc_mcam_high_zone_percent_set,
-			     rvu_af_dl_npc_mcam_high_zone_percent_validate),
 };
 
 /* Devlink switch mode */
