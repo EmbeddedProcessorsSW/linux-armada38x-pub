@@ -1829,13 +1829,13 @@ void npc_mcam_rsrcs_deinit(struct rvu *rvu)
 {
 	struct npc_mcam *mcam = &rvu->hw->mcam;
 
-	devm_kfree(rvu->dev, mcam->bmap);
-	devm_kfree(rvu->dev, mcam->bmap_reverse);
-	devm_kfree(rvu->dev, mcam->entry2pfvf_map);
-	devm_kfree(rvu->dev, mcam->cntr2pfvf_map);
-	devm_kfree(rvu->dev, mcam->entry2cntr_map);
-	devm_kfree(rvu->dev, mcam->cntr_refcnt);
-	devm_kfree(rvu->dev, mcam->entry2target_pffunc);
+	bitmap_free(mcam->bmap);
+	bitmap_free(mcam->bmap_reverse);
+	kfree(mcam->entry2pfvf_map);
+	kfree(mcam->cntr2pfvf_map);
+	kfree(mcam->entry2cntr_map);
+	kfree(mcam->cntr_refcnt);
+	kfree(mcam->entry2target_pffunc);
 	kfree(mcam->counters.bmap);
 }
 
@@ -1883,21 +1883,19 @@ int npc_mcam_rsrcs_init(struct rvu *rvu, int blkaddr)
 	mcam->pf_offset = mcam->nixlf_offset + nixlf_count;
 
 	/* Allocate bitmaps for managing MCAM entries */
-	mcam->bmap = devm_kcalloc(rvu->dev, BITS_TO_LONGS(mcam->bmap_entries),
-				  sizeof(long), GFP_KERNEL);
+	mcam->bmap = bitmap_zalloc(mcam->bmap_entries, GFP_KERNEL);
 	if (!mcam->bmap)
 		return -ENOMEM;
 
-	mcam->bmap_reverse = devm_kcalloc(rvu->dev, BITS_TO_LONGS(mcam->bmap_entries),
-					  sizeof(long), GFP_KERNEL);
+	mcam->bmap_reverse = bitmap_zalloc(mcam->bmap_entries, GFP_KERNEL);
 	if (!mcam->bmap_reverse)
 		goto free_bmap;
 
 	mcam->bmap_fcnt = mcam->bmap_entries;
 
 	/* Alloc memory for saving entry to RVU PFFUNC allocation mapping */
-	mcam->entry2pfvf_map = devm_kcalloc(rvu->dev, mcam->bmap_entries,
-					    sizeof(u16), GFP_KERNEL);
+	mcam->entry2pfvf_map = kcalloc(mcam->bmap_entries,
+				       sizeof(u16), GFP_KERNEL);
 	if (!mcam->entry2pfvf_map)
 		goto free_bmap_reverse;
 
@@ -1920,27 +1918,27 @@ int npc_mcam_rsrcs_init(struct rvu *rvu, int blkaddr)
 	if (err)
 		goto free_entry_map;
 
-	mcam->cntr2pfvf_map = devm_kcalloc(rvu->dev, mcam->counters.max,
-					   sizeof(u16), GFP_KERNEL);
+	mcam->cntr2pfvf_map = kcalloc(mcam->counters.max,
+				      sizeof(u16), GFP_KERNEL);
 	if (!mcam->cntr2pfvf_map)
 		goto free_cntr_bmap;
 
 	/* Alloc memory for MCAM entry to counter mapping and for tracking
 	 * counter's reference count.
 	 */
-	mcam->entry2cntr_map = devm_kcalloc(rvu->dev, mcam->bmap_entries,
-					    sizeof(u16), GFP_KERNEL);
+	mcam->entry2cntr_map = kcalloc(mcam->bmap_entries,
+				       sizeof(u16), GFP_KERNEL);
 	if (!mcam->entry2cntr_map)
 		goto free_cntr_map;
 
-	mcam->cntr_refcnt = devm_kcalloc(rvu->dev, mcam->counters.max,
-					 sizeof(u16), GFP_KERNEL);
+	mcam->cntr_refcnt = kcalloc(mcam->counters.max,
+				    sizeof(u16), GFP_KERNEL);
 	if (!mcam->cntr_refcnt)
 		goto free_entry_cntr_map;
 
 	/* Alloc memory for saving target device of mcam rule */
-	mcam->entry2target_pffunc = devm_kcalloc(rvu->dev, mcam->total_entries,
-						 sizeof(u16), GFP_KERNEL);
+	mcam->entry2target_pffunc = kcalloc(mcam->total_entries,
+					    sizeof(u16), GFP_KERNEL);
 	if (!mcam->entry2target_pffunc)
 		goto free_cntr_refcnt;
 
@@ -1957,19 +1955,19 @@ int npc_mcam_rsrcs_init(struct rvu *rvu, int blkaddr)
 	return 0;
 
 free_cntr_refcnt:
-	devm_kfree(rvu->dev, mcam->cntr_refcnt);
+	kfree(mcam->cntr_refcnt);
 free_entry_cntr_map:
-	devm_kfree(rvu->dev, mcam->entry2cntr_map);
+	kfree(mcam->entry2cntr_map);
 free_cntr_map:
-	devm_kfree(rvu->dev, mcam->cntr2pfvf_map);
+	kfree(mcam->cntr2pfvf_map);
 free_cntr_bmap:
 	kfree(mcam->counters.bmap);
 free_entry_map:
-	devm_kfree(rvu->dev, mcam->entry2pfvf_map);
+	kfree(mcam->entry2pfvf_map);
 free_bmap_reverse:
-	devm_kfree(rvu->dev, mcam->bmap_reverse);
+	bitmap_free(mcam->bmap_reverse);
 free_bmap:
-	devm_kfree(rvu->dev, mcam->bmap);
+	bitmap_free(mcam->bmap);
 
 	return -ENOMEM;
 }
