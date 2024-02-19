@@ -177,7 +177,7 @@ void closid_free(int closid)
  */
 static bool closid_allocated(unsigned int closid)
 {
-	return test_bit(closid, closid_free_map);
+	return !test_bit(closid, closid_free_map);
 }
 
 /**
