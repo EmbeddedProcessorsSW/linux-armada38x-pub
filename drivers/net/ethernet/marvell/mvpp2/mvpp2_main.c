@@ -4336,7 +4336,21 @@ static netdev_tx_t mvpp2_tx(struct sk_buff *skb, struct net_device *dev)
 	int frags = 0;
 	u16 txq_id;
 	u32 tx_cmd;
+	int i;
+	unsigned int cpu = smp_processor_id();
 
+	for (i = 0; i < port->nqvecs; i++) {
+		struct mvpp2_queue_vector *qv = port->qvecs + i;
+		struct irq_desc *desc = irq_data_to_desc(irq_get_irq_data(qv->irq));
+
+		if (qv->type == MVPP2_QUEUE_VECTOR_PRIVATE && desc->affinity_hint) {
+			if ((cpumask_test_cpu(cpu, desc->affinity_hint) &&
+			     !(cpumask_test_cpu(cpu, desc->irq_common_data.affinity)))) {
+				irq_set_affinity_hint(qv->irq, desc->affinity_hint);
+				break;
+			}
+		}
+	}
 	thread = mvpp2_cpu_to_thread(port->priv, smp_processor_id());
 
 	txq_id = skb_get_queue_mapping(skb);
