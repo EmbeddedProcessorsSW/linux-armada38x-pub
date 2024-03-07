@@ -167,7 +167,7 @@
 				msi-controller;
 			};
 
-			xor@400000 {
+			xor0: xor@400000 {
 				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
 				reg = <0x400000 0x1000>,
 				      <0x410000 0x1000>;
@@ -176,7 +176,7 @@
 				dma-coherent;
 			};
 
-			xor@420000 {
+			xor1: xor@420000 {
 				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
 				reg = <0x420000 0x1000>,
 				      <0x430000 0x1000>;
@@ -185,7 +185,7 @@
 				dma-coherent;
 			};
 
-			xor@440000 {
+			xor2: xor@440000 {
 				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
 				reg = <0x440000 0x1000>,
 				      <0x450000 0x1000>;
@@ -194,13 +194,33 @@
 				dma-coherent;
 			};
 
-			xor@460000 {
+			xor3: xor@460000 {
 				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
 				reg = <0x460000 0x1000>,
 				      <0x470000 0x1000>;
 				msi-parent = <&gic_v2m0>;
 				clocks = <&ap_clk 3>;
 				dma-coherent;
+			};
+
+			uio_xor0: uio-xor0 {
+				compatible = "marvell,uio-xor-v2";
+				xor_access = <&xor0>;
+			};
+
+			uio_xor1: uio-xor1 {
+				compatible = "marvell,uio-xor-v2";
+				xor_access = <&xor1>;
+			};
+
+			uio_xor2: uio-xor2 {
+				compatible = "marvell,uio-xor-v2";
+				xor_access = <&xor2>;
+			};
+
+			uio_xor3: uio-xor3 {
+				compatible = "marvell,uio-xor-v2";
+				xor_access = <&xor3>;
 			};
 
 			spi0: spi@510600 {
@@ -300,6 +320,11 @@
 					interrupts = <18>;
 					#thermal-sensor-cells = <1>;
 				};
+			};
+
+			musdk_cma {
+				compatible = "marvell,musdk-cma";
+				dma-coherent;
 			};
 		};
 	};

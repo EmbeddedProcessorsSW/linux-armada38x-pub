@@ -66,7 +66,7 @@
 			clock-names = "pp_clk", "gop_clk",
 				      "mg_clk", "mg_core_clk", "axi_clk";
 			marvell,system-controller = <&CP11X_LABEL(syscon0)>;
-			status = "disabled";
+			status = "okay";
 			dma-coherent;
 
 			CP11X_LABEL(eth0): eth0 {
@@ -125,6 +125,13 @@
 				gop-port-id = <3>;
 				status = "disabled";
 			};
+		};
+
+		CP11X_LABEL(uio_ethernet): EVALUATOR(uio_pp_, CP11X_NUM)@0 {
+			compatible = "generic-uio";
+			reg = <0x0 0x90000>, <0x130000 0x6000>,
+			      <0x220000 0x1000>;
+			reg-names = "pp", "mspg", "cm3";
 		};
 
 		CP11X_LABEL(comphy): phy@120000 {
@@ -369,6 +376,16 @@
 				 <&CP11X_LABEL(clk) 1 14>;
 		};
 
+		CP11X_LABEL(uio_xor0) {
+			compatible = "marvell,uio-xor-v2";
+			xor_access = <&CP11X_LABEL(xor0)>;
+		};
+
+		CP11X_LABEL(uio_xor1) {
+			compatible = "marvell,uio-xor-v2";
+			xor_access = <&CP11X_LABEL(xor1)>;
+		};
+
 		CP11X_LABEL(spi0): spi@700600 {
 			compatible = "marvell,armada-380-spi";
 			reg = <0x700600 0x50>;
@@ -518,6 +535,11 @@
 			clocks = <&CP11X_LABEL(clk) 1 26>,
 				 <&CP11X_LABEL(clk) 1 17>;
 			dma-coherent;
+		};
+
+		CP11X_LABEL(uio_sam): uio_sam@800000 {
+			compatible = "marvell,uio-sam";
+			eip_access = <&CP11X_LABEL(crypto)>;
 		};
 	};
 
