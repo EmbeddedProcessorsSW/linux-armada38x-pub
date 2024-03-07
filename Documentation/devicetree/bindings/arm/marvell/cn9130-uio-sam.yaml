@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+
+title: Marvell UIO for Security Acceleration Module (SAM)
+
+properties:
+  compatible: should be "marvell,uio-sam".
+  eip_access: phandler to EIP crypto driver
+
+example:
+  - |
+    CP110_LABEL(uio_sam): uio_sam@800000 {
+	compatible = "marvell,uio-sam";
+	eip_access = <&CP110_LABEL(crypto)>;
+    };

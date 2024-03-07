@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+
+title: Marvell MUSDK continuous memory allocation driver (BM)
+
+properties:
+  compatible: should be "marvell,musdk-cma".
+
+Optional properties:
+  dma-coherent
+
+examples:
+  - |
+    musdk_cma {
+	compatible = "marvell,musdk-cma";
+	dma-coherent;
+    };

@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+
+title: Marvell UIO for XOR driver
+
+properties:
+  compatible: should be "marvell,uio-xor-v2".
+  xor_access: phandler to XOR driver
+
+examples:
+  - |
+    P110_LABEL(uio_xor1) {
+	compatible = "marvell,uio-xor-v2";
+	xor_access = <&CP110_LABEL(xor1)>;
+    };
