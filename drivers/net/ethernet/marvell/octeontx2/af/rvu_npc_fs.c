@@ -1215,6 +1215,9 @@ static int npc_update_tx_entry(struct rvu *rvu, struct rvu_pfvf *pfvf,
 	u64 mask = ~0ULL;
 	int mce_index;
 
+	if (is_pffunc_af(req->hdr.pcifunc) && !rvu->rep_mode)
+		mask = 0;
+
 	npc_update_entry(rvu, NPC_PF_FUNC, entry, (__force u16)htons(target),
 			 0, mask, 0, NIX_INTF_TX);
 

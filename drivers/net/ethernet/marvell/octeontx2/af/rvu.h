@@ -654,6 +654,7 @@ struct rvu {
 	u16			rep_pcifunc;
 	int			rep_cnt;
 	u16			*rep2pfvf_map;
+	u8			rep_mode;
 	struct			work_struct rep_evt_work;
 	struct			workqueue_struct *rep_evt_wq;
 	struct list_head	rep_evtq_head;
@@ -1237,6 +1238,7 @@ u64 rvu_tim_ptp_rollover_errata_fix(struct rvu *rvu, u64 time);
 void rvu_switch_enable(struct rvu *rvu);
 void rvu_switch_disable(struct rvu *rvu);
 void rvu_switch_update_rules(struct rvu *rvu, u16 pcifunc, bool ena);
+void rvu_switch_enable_lbk_link(struct rvu *rvu, u16 pcifunc, bool ena);
 
 /* RVU REP */
 int rvu_rep_notify_representee_state(struct rvu *rvu, u16 pcifunc, bool enable);
@@ -1251,4 +1253,9 @@ int rvu_mcs_init(struct rvu *rvu);
 int rvu_mcs_flr_handler(struct rvu *rvu, u16 pcifunc);
 void rvu_mcs_ptp_cfg(struct rvu *rvu, u8 rpm_id, u8 lmac_id, bool ena);
 void rvu_mcs_exit(struct rvu *rvu);
+
+/* Representor APIs */
+int rvu_rep_pf_init(struct rvu *rvu);
+int rvu_rep_install_mcam_rules(struct rvu *rvu);
+void rvu_rep_update_rules(struct rvu *rvu, u16 pcifunc, bool ena);
 #endif /* RVU_H */

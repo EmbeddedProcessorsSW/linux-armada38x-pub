@@ -15701,8 +15701,8 @@ static struct npc_mcam_kex npc_mkex_default = {
 			[NPC_LT_LA_IH_NIX_ETHER] = {
 				/* PF_FUNC: 2B , KW0 [47:32] */
 				KEX_LD_CFG(0x01, 0x0, 0x1, 0x0, 0x4),
-				/* SQ_ID 3 bytes, KW1[63:16] */
-				KEX_LD_CFG(0x02, 0x02, 0x1, 0x0, 0xa),
+				/* DMAC: 6 bytes, KW1[63:16] */
+				KEX_LD_CFG(0x05, 0x8, 0x1, 0x0, 0xa),
 			},
 			/* Layer A: HiGig2: */
 			[NPC_LT_LA_IH_NIX_HIGIG2_ETHER] = {
