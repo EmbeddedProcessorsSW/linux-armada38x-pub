@@ -14,6 +14,7 @@
 #include <linux/net_tstamp.h>
 #include <linux/ptp_clock_kernel.h>
 #include <linux/timecounter.h>
+#include <linux/soc/marvell/silicons.h>
 #include <linux/soc/marvell/octeontx2/asm.h>
 #include <net/macsec.h>
 #include <net/pkt_cls.h>
@@ -31,6 +32,7 @@
 #include <rvu_trace.h>
 #include "qos.h"
 #include "rep.h"
+#include "cn20k.h"
 
 /* IPv4 flag more fragment bit */
 #define IPV4_FLAG_MORE				0x20
@@ -360,6 +362,11 @@ struct dev_hw_ops {
 			     int size, int qidx);
 	int	(*refill_pool_ptrs)(void *dev, struct otx2_cq_queue *cq);
 	void	(*aura_freeptr)(void *dev, int aura, u64 buf);
+	int	(*aura_aq_init)(struct otx2_nic *pfvf, int aura_id,
+				int pool_id, int numptrs);
+	int	(*pool_aq_init)(struct otx2_nic *pfvf, u16 pool_id,
+				int stack_pages, int numptrs, int buf_size,
+				int type);
 };
 
 #define CN10K_MCS_SA_PER_SC	4
@@ -640,6 +647,14 @@ static inline void otx2_setup_dev_hw_settings(struct otx2_nic *pfvf)
 
 	if (is_dev_cn10kb(pfvf->pdev))
 		__set_bit(CN10K_HW_MACSEC, &hw->cap_flag);
+}
+
+static inline void otx2_setup_devops(struct otx2_nic *pfvf)
+{
+	if (is_cn20k(pfvf->pdev)) {
+		cn20k_init(pfvf);
+		return;
+	}
 }
 
 /* Register read/write APIs */
@@ -1042,6 +1057,10 @@ int otx2_alloc_queue_mem(struct otx2_nic *pf);
 void otx2_disable_napi(struct otx2_nic *pf);
 irqreturn_t otx2_cq_intr_handler(int irq, void *cq_irq);
 int otx2_init_rsrc(struct pci_dev *pdev, struct otx2_nic *pf);
+int otx2_aura_aq_init(struct otx2_nic *pfvf, int aura_id,
+		      int pool_id, int numptrs);
+int otx2_pool_aq_init(struct otx2_nic *pfvf, u16 pool_id,
+		      int stack_pages, int numptrs, int buf_size, int type);
 
 /* RSS configuration APIs*/
 int otx2_rss_init(struct otx2_nic *pfvf);

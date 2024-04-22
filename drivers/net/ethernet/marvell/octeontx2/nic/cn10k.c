@@ -14,6 +14,8 @@ static struct dev_hw_ops	otx2_hw_ops = {
 	.sqe_flush = otx2_sqe_flush,
 	.aura_freeptr = otx2_aura_freeptr,
 	.refill_pool_ptrs = otx2_refill_pool_ptrs,
+	.aura_aq_init = otx2_aura_aq_init,
+	.pool_aq_init = otx2_pool_aq_init,
 };
 
 static struct dev_hw_ops cn10k_hw_ops = {
@@ -21,6 +23,8 @@ static struct dev_hw_ops cn10k_hw_ops = {
 	.sqe_flush = cn10k_sqe_flush,
 	.aura_freeptr = cn10k_aura_freeptr,
 	.refill_pool_ptrs = cn10k_refill_pool_ptrs,
+	.aura_aq_init = otx2_aura_aq_init,
+	.pool_aq_init = otx2_pool_aq_init,
 };
 
 int cn10k_lmtst_init(struct otx2_nic *pfvf)
