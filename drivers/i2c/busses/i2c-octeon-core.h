@@ -216,6 +216,7 @@ static inline void octeon_i2c_write_int(struct octeon_i2c *i2c, u64 data)
 
 #define FREQ_400KHZ 400000
 #define PCI_SUBSYS_DEVID_9XXX 0xB
+#define PCI_SUBSYS_DEVID_CN20X 0xC
 /**
  * octeon_i2c_is_otx2 - check for chip ID
  * @pdev: PCI dev structure
@@ -226,7 +227,8 @@ static inline bool octeon_i2c_is_otx2(struct pci_dev *pdev)
 {
 	u32 chip_id = (pdev->subsystem_device >> 12) & 0xF;
 
-	return (chip_id == PCI_SUBSYS_DEVID_9XXX);
+	return (chip_id == PCI_SUBSYS_DEVID_9XXX ||
+		chip_id == PCI_SUBSYS_DEVID_CN20X);
 }
 
 /* Prototypes */
