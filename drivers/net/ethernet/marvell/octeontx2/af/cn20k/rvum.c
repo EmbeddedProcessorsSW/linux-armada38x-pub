@@ -10,7 +10,7 @@
 
 #include "../rvu.h"
 #include "rvu_eblock.h"
-#include "rvum_reg.h"
+#include "reg.h"
 #include "rvum.h"
 
 int rvu_cn20k_get_blk_addr(struct rvu *rvu, int blktype,

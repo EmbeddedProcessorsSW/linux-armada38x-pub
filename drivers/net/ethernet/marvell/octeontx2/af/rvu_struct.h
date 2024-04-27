@@ -35,7 +35,8 @@ enum rvu_block_addr_e {
 	BLKADDR_REE0		= 0x14ULL,
 	BLKADDR_REE1		= 0x15ULL,
 	BLKADDR_APR		= 0x16ULL,
-	BLK_COUNT		= 0x17ULL,
+	BLKADDR_MBOX		= 0x1bULL,
+	BLK_COUNT		= 0x1cULL,
 };
 
 /* RVU Block Type Enumeration */
@@ -52,7 +53,8 @@ enum rvu_block_type_e {
 	BLKTYPE_CPT  = 0x9,
 	BLKTYPE_NDC  = 0xa,
 	BLKTYPE_REE  = 0xe,
-	BLKTYPE_MAX  = 0xe,
+	BLKTYPE_MBOX = 0x13,
+	BLKTYPE_MAX  = 0x13,
 };
 
 /* RVU Admin function Interrupt Vector Enumeration */
