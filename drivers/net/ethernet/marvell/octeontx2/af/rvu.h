@@ -10,6 +10,7 @@
 
 #include <linux/pci.h>
 #include <net/devlink.h>
+#include <linux/soc/marvell/silicons.h>
 
 #include "rvu_struct.h"
 #include "rvu_devlink.h"
@@ -1109,6 +1110,9 @@ int rvu_nix_mcast_update_mcam_entry(struct rvu *rvu, u16 pcifunc,
 				    u32 mcast_grp_idx, u16 mcam_index);
 int rvu_nix_tl1_xoff_wait_for_link_credits(struct rvu *rvu, u16 pcifunc);
 int rvu_nix_tl1_xoff_clear(struct rvu *rvu, u16 pcifunc);
+int rvu_nix_aq_enq_inst(struct rvu *rvu, struct nix_aq_enq_req *req,
+			struct nix_aq_enq_rsp *rsp);
+
 
 /* NPC APIs */
 void rvu_npc_freemem(struct rvu *rvu);
