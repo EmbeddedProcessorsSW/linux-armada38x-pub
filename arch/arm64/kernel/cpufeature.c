@@ -3508,8 +3508,22 @@ static int emulate_sys_reg(u32 id, u64 *valp)
 		return emulate_id_reg(id, valp);
 
 	regp = get_arm64_ftr_reg_nowarn(id);
-	if (regp)
+	if (regp) {
 		*valp = arm64_ftr_reg_user_value(regp);
+		preempt_disable();
+		if (IS_ENABLED(CONFIG_ARM64_ERRATUM_SSBS2) &&
+		    this_cpu_has_cap(ARM64_WORKAROUND_SSBS2) &&
+		    (id ==  SYS_ID_AA64PFR1_EL1)) {
+			/* Dont expose the SSBS2 feature to EL0.
+			 * Hence override SSBS field with SSBS_IMP
+			 * insead of SSBS2.
+			 */
+			*valp &= ~ID_AA64PFR1_EL1_SSBS_MASK;
+			*valp |= ID_AA64PFR1_EL1_SSBS_IMP <<
+				ID_AA64PFR1_EL1_SSBS_SHIFT;
+		}
+		preempt_enable();
+	}
 	else
 		/*
 		 * The untracked registers are either IMPLEMENTATION DEFINED

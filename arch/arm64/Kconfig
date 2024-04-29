@@ -1015,6 +1015,22 @@ config ARM64_ERRATUM_2966298
 
 	  If unsure, say Y.
 
+config ARM64_ERRATUM_SSBS2
+	bool "Neoverse-N2: SSBS2: Workaround for SSBS2"
+	default y
+	help
+	  This option adds the workaround for Neoverse-N2 erratum SSBS2.
+
+          Due to an erratum on Neoverse N2 cores, setting of PSTATE.SSBS to 0 is not fully
+          self-synchronizing.
+
+          Workaround is to add a SB barrier after every write of PSTATE.SSBS=0.
+
+          Also kernel should not advertise the presence of MRS/MSR instructions
+          to read/write SSBS from EL0.
+
+	  If unsure, say Y.
+
 config CAVIUM_ERRATUM_22375
 	bool "Cavium erratum 22375, 24313"
 	default y
