@@ -613,7 +613,8 @@ static void mpam_resctrl_pick_caches(void)
 	lockdep_assert_cpus_held();
 
 	idx = srcu_read_lock(&mpam_srcu);
-	list_for_each_entry_rcu(class, &mpam_classes, classes_list) {
+	list_for_each_entry_srcu(class, &mpam_classes, classes_list,
+				 srcu_read_lock_held(&mpam_srcu)) {
 		struct mpam_props *cprops = &class->props;
 		bool has_cpor = cache_has_usable_cpor(class);
 
@@ -672,7 +673,8 @@ static void mpam_resctrl_pick_mba(void)
 	lockdep_assert_cpus_held();
 
 	idx = srcu_read_lock(&mpam_srcu);
-	list_for_each_entry_rcu(class, &mpam_classes, classes_list) {
+	list_for_each_entry_srcu(class, &mpam_classes, classes_list,
+				 srcu_read_lock_held(&mpam_srcu)) {
 		struct mpam_props *cprops = &class->props;
 
 		if (class->level < 3)
@@ -1024,7 +1026,8 @@ void resctrl_arch_reset_resources(void)
 			continue;
 
 		idx = srcu_read_lock(&mpam_srcu);
-		list_for_each_entry_rcu(class, &mpam_classes, classes_list)
+		list_for_each_entry_srcu(class, &mpam_classes, classes_list,
+					 srcu_read_lock_held(&mpam_srcu))
 			mpam_reset_class(class);
 		srcu_read_unlock(&mpam_srcu, idx);
 	}

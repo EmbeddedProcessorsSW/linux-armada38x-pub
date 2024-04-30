@@ -973,7 +973,8 @@ static int _msmon_read(struct mpam_component *comp, struct mon_read *arg)
 	struct mpam_msc_ris *ris;
 
 	idx = srcu_read_lock(&mpam_srcu);
-	list_for_each_entry_rcu(ris, &comp->ris, comp_list) {
+	list_for_each_entry_srcu(ris, &comp->ris, comp_list,
+				 srcu_read_lock_held(&mpam_srcu)) {
 		arg->ris = ris;
 
 		msc = ris->msc;
@@ -1055,7 +1056,8 @@ void mpam_msmon_reset_mbwu(struct mpam_component *comp, struct mon_cfg *ctx)
 		return;
 
 	idx = srcu_read_lock(&mpam_srcu);
-	list_for_each_entry_rcu(ris, &comp->ris, comp_list) {
+	list_for_each_entry_srcu(ris, &comp->ris, comp_list,
+				 srcu_read_lock_held(&mpam_srcu)) {
 		if (!mpam_has_feature(mpam_feat_msmon_mbwu, &ris->props))
 			continue;
 
@@ -1315,7 +1317,8 @@ static void mpam_reset_msc(struct mpam_msc *msc, bool online)
 	lockdep_assert_held(&msc->lock);
 
 	idx = srcu_read_lock(&mpam_srcu);
-	list_for_each_entry_rcu(ris, &msc->ris, msc_list) {
+	list_for_each_entry_srcu(ris, &msc->ris, msc_list,
+				 srcu_read_lock_held(&mpam_srcu)) {
 		mpam_touch_msc(msc, &mpam_reset_ris, ris);
 
 		/*
@@ -1341,7 +1344,8 @@ static void mpam_reprogram_msc(struct mpam_msc *msc)
 	lockdep_assert_held(&msc->lock);
 
 	idx = srcu_read_lock(&mpam_srcu);
-	list_for_each_entry_rcu(ris, &msc->ris, msc_list) {
+	list_for_each_entry_srcu(ris, &msc->ris, msc_list,
+				 srcu_read_lock_held(&mpam_srcu)) {
 		if (!mpam_is_enabled() && !ris->in_reset_state) {
 			mpam_touch_msc(msc, &mpam_reset_ris, ris);
 			ris->in_reset_state = true;
@@ -1376,7 +1380,8 @@ static int mpam_cpu_online(unsigned int cpu)
 	struct mpam_msc *msc;
 
 	idx = srcu_read_lock(&mpam_srcu);
-	list_for_each_entry_rcu(msc, &mpam_all_msc, glbl_list) {
+	list_for_each_entry_srcu(msc, &mpam_all_msc, glbl_list,
+				 srcu_read_lock_held(&mpam_srcu)) {
 		if (!cpumask_test_cpu(cpu, &msc->accessibility))
 			continue;
 
@@ -1438,7 +1443,8 @@ static int mpam_cpu_offline(unsigned int cpu)
 	struct mpam_msc *msc;
 
 	idx = srcu_read_lock(&mpam_srcu);
-	list_for_each_entry_rcu(msc, &mpam_all_msc, glbl_list) {
+	list_for_each_entry_srcu(msc, &mpam_all_msc, glbl_list,
+				 srcu_read_lock_held(&mpam_srcu)) {
 		if (!cpumask_test_cpu(cpu, &msc->accessibility))
 			continue;
 
@@ -2222,10 +2228,12 @@ void mpam_reset_class(struct mpam_class *class)
 	struct mpam_component *comp;
 
 	idx = srcu_read_lock(&mpam_srcu);
-	list_for_each_entry_rcu(comp, &class->components, class_list) {
+	list_for_each_entry_srcu(comp, &class->components, class_list,
+				 srcu_read_lock_held(&mpam_srcu)) {
 		memset(comp->cfg, 0, (mpam_partid_max * sizeof(*comp->cfg)));
 
-		list_for_each_entry_rcu(ris, &comp->ris, comp_list) {
+		list_for_each_entry_srcu(ris, &comp->ris, comp_list,
+					 srcu_read_lock_held(&mpam_srcu)) {
 			mutex_lock(&ris->msc->lock);
 			mpam_touch_msc(ris->msc, mpam_reset_ris, ris);
 			mutex_unlock(&ris->msc->lock);
@@ -2259,7 +2267,8 @@ static irqreturn_t mpam_disable_thread(int irq, void *dev_id)
 	mpam_unregister_irqs();
 
 	idx = srcu_read_lock(&mpam_srcu);
-	list_for_each_entry_rcu(class, &mpam_classes, classes_list)
+	list_for_each_entry_srcu(class, &mpam_classes, classes_list,
+				 srcu_read_lock_held(&mpam_srcu))
 		mpam_reset_class(class);
 	srcu_read_unlock(&mpam_srcu, idx);
 
@@ -2350,7 +2359,8 @@ int mpam_apply_config(struct mpam_component *comp, u16 partid,
 	arg.partid = partid;
 
 	idx = srcu_read_lock(&mpam_srcu);
-	list_for_each_entry_rcu(ris, &comp->ris, comp_list) {
+	list_for_each_entry_srcu(ris, &comp->ris, comp_list,
+				 srcu_read_lock_held(&mpam_srcu)) {
 		arg.ris = ris;
 		mutex_lock(&ris->msc->lock);
 		mpam_touch_msc(ris->msc, __write_config, &arg);
