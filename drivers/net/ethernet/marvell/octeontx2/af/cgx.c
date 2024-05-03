@@ -16,6 +16,7 @@
 #include <linux/of.h>
 #include <linux/of_mdio.h>
 #include <linux/of_net.h>
+#include <linux/soc/marvell/silicons.h>
 
 #include "cgx.h"
 #include "rvu.h"
@@ -2194,7 +2195,7 @@ static int cgx_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		& CGX_ID_MASK;
 
 	 /* Skip probe if CGX is not mapped to NIX */
-	if (!is_cgx_mapped_to_nix(pdev->subsystem_device, cgx->cgx_id)) {
+	if (!is_cn20k(pdev) && !is_cgx_mapped_to_nix(pdev->subsystem_device, cgx->cgx_id)) {
 		dev_notice(dev, "CGX %d not mapped to NIX, skipping probe\n", cgx->cgx_id);
 		goto err_release_regions;
 	}
