@@ -128,6 +128,8 @@ static int __init armada_8k_cpufreq_init(void)
 	struct cpumask cpus;
 
 	node = of_find_compatible_node(NULL, NULL, "marvell,ap806-cpu-clock");
+	if (!node)
+		node = of_find_compatible_node(NULL, NULL, "marvell,ap807-cpu-clock");
 	if (!node || !of_device_is_available(node)) {
 		of_node_put(node);
 		return -ENODEV;
