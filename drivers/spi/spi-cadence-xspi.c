@@ -285,7 +285,7 @@ struct dentry *mrvl_spi_debug_root;
 #define SPI_NOT_CLAIMED				0x00
 #define SPI_AP_NS_OWN				0x02
 #define CDNS_XSPI_PHY_CTB_RFILE_PHY_GPIO_CTRL_1	0x8c
-#define SPI_LOCK_TIMEOUT			100
+#define SPI_LOCK_TIMEOUT			100 /* 1 second timeout */
 #define	SPI_LOCK_CHECK_TIMEOUT			10
 #define SPI_LOCK_SLEEP_DURATION_MS		10
 #endif
@@ -383,38 +383,29 @@ static int unlock_spi_bus(struct cdns_xspi_dev *cdns_xspi)
 static int lock_spi_bus(struct cdns_xspi_dev *cdns_xspi)
 {
 	uint32_t val = 0;
-	int timeout = SPI_LOCK_TIMEOUT; //10 second timeout
+	int timeout = SPI_LOCK_TIMEOUT;
 
-	while (timeout >= 0) {
+	while (timeout-- >= 0) {
 		val = readl(cdns_xspi->auxbase + CDNS_XSPI_PHY_CTB_RFILE_PHY_GPIO_CTRL_1);
 		if (val == SPI_NOT_CLAIMED || val == SPI_AP_NS_OWN) {
+			int check;
+
 			writel(SPI_AP_NS_OWN,
 			       cdns_xspi->auxbase + CDNS_XSPI_PHY_CTB_RFILE_PHY_GPIO_CTRL_1);
-			break;
+
+			for (check = SPI_LOCK_CHECK_TIMEOUT + 1; check > 0; check--) {
+				val = readl(cdns_xspi->auxbase +
+					    CDNS_XSPI_PHY_CTB_RFILE_PHY_GPIO_CTRL_1);
+				if (val != SPI_AP_NS_OWN)
+					break; // somebody else won the race, let's keep trying
+			}
+			if (check == 0)
+				return 0; // We got a lock
 		}
 		mdelay(SPI_LOCK_SLEEP_DURATION_MS);
-		timeout--;
 	}
 
-	if (timeout < 0)
-		goto fail;
-
-	timeout = SPI_LOCK_CHECK_TIMEOUT;
-	while (timeout >= 0) {
-		if (readl(cdns_xspi->auxbase + CDNS_XSPI_PHY_CTB_RFILE_PHY_GPIO_CTRL_1) !=
-			  SPI_AP_NS_OWN)
-			break;
-		timeout--;
-	}
-
-	if (timeout != -1)
-		goto fail;
-
-	return 0;
-
-fail:
-	pr_err("Flash arbitration failed, lock is owned by: %d\n",
-		readl(cdns_xspi->auxbase + CDNS_XSPI_PHY_CTB_RFILE_PHY_GPIO_CTRL_1));
+	pr_err("Flash arbitration failed, lock is owned by: %d\n", val);
 	return -1;
 }
 
