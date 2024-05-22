@@ -78,6 +78,7 @@ static irqreturn_t rvu_nix_af_rvu_intr_handler(int irq, void *rvu_irq)
 
 	nix_event_context = rvu_dl->rvu_nix_health_reporter->nix_event_ctx;
 	intr = rvu_read64(rvu, blkaddr, NIX_AF_RVU_INT);
+	dev_err_ratelimited(rvu->dev, "NIX_AF_RVU_INT = 0x%llx\n", intr);
 	nix_event_context->nix_af_rvu_int = intr;
 
 	/* Clear interrupts */
@@ -113,6 +114,10 @@ static irqreturn_t rvu_nix_af_rvu_gen_handler(int irq, void *rvu_irq)
 
 	nix_event_context = rvu_dl->rvu_nix_health_reporter->nix_event_ctx;
 	intr = rvu_read64(rvu, blkaddr, NIX_AF_GEN_INT);
+	if ((intr & 0x1f) == 0x10)
+		dev_info_ratelimited(rvu->dev, "NIX_AF_GEN_INT = 0x%llx\n", intr);
+	else
+		dev_err_ratelimited(rvu->dev, "NIX_AF_GEN_INT = 0x%llx\n", intr);
 	nix_event_context->nix_af_rvu_gen = intr;
 
 	/* Clear interrupts */
@@ -148,6 +153,7 @@ static irqreturn_t rvu_nix_af_rvu_err_handler(int irq, void *rvu_irq)
 
 	nix_event_context = rvu_dl->rvu_nix_health_reporter->nix_event_ctx;
 	intr = rvu_read64(rvu, blkaddr, NIX_AF_ERR_INT);
+	dev_err_ratelimited(rvu->dev, "NIX_AF_ERR_INT = 0x%llx\n", intr);
 	nix_event_context->nix_af_rvu_err = intr;
 
 	/* Clear interrupts */
@@ -182,7 +188,8 @@ static irqreturn_t rvu_nix_af_rvu_ras_handler(int irq, void *rvu_irq)
 		return IRQ_NONE;
 
 	nix_event_context = rvu_dl->rvu_nix_health_reporter->nix_event_ctx;
-	intr = rvu_read64(rvu, blkaddr, NIX_AF_ERR_INT);
+	intr = rvu_read64(rvu, blkaddr, NIX_AF_RAS);
+	dev_err_ratelimited(rvu->dev, "NIX_AF_RAS = 0x%llx\n", intr);
 	nix_event_context->nix_af_rvu_ras = intr;
 
 	/* Clear interrupts */
