@@ -16,6 +16,7 @@ static struct dev_hw_ops	otx2_hw_ops = {
 	.refill_pool_ptrs = otx2_refill_pool_ptrs,
 	.aura_aq_init = otx2_aura_aq_init,
 	.pool_aq_init = otx2_pool_aq_init,
+	.pfaf_mbox_intr_handler = otx2_pfaf_mbox_intr_handler,
 };
 
 static struct dev_hw_ops cn10k_hw_ops = {
@@ -25,7 +26,19 @@ static struct dev_hw_ops cn10k_hw_ops = {
 	.refill_pool_ptrs = cn10k_refill_pool_ptrs,
 	.aura_aq_init = otx2_aura_aq_init,
 	.pool_aq_init = otx2_pool_aq_init,
+	.pfaf_mbox_intr_handler = otx2_pfaf_mbox_intr_handler,
 };
+
+void otx2_init_hw_ops(struct otx2_nic *pfvf)
+{
+	if (!test_bit(CN10K_LMTST, &pfvf->hw.cap_flag)) {
+		pfvf->hw_ops = &otx2_hw_ops;
+		return;
+	}
+
+	pfvf->hw_ops = &cn10k_hw_ops;
+}
+EXPORT_SYMBOL(otx2_init_hw_ops);
 
 int cn10k_lmtst_init(struct otx2_nic *pfvf)
 {
@@ -34,12 +47,9 @@ int cn10k_lmtst_init(struct otx2_nic *pfvf)
 	struct otx2_lmt_info *lmt_info;
 	int err, cpu;
 
-	if (!test_bit(CN10K_LMTST, &pfvf->hw.cap_flag)) {
-		pfvf->hw_ops = &otx2_hw_ops;
+	if (!test_bit(CN10K_LMTST, &pfvf->hw.cap_flag))
 		return 0;
-	}
 
-	pfvf->hw_ops = &cn10k_hw_ops;
 	/* Total LMTLINES = num_online_cpus() * 32 (For Burst flush).*/
 	pfvf->tot_lmt_lines = (num_online_cpus() * LMT_BURST_SIZE);
 	pfvf->hw.lmt_info = alloc_percpu(struct otx2_lmt_info);

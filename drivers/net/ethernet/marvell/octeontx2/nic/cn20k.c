@@ -199,6 +199,7 @@ static struct dev_hw_ops cn20k_hw_ops = {
 	.refill_pool_ptrs = cn10k_refill_pool_ptrs,
 	.aura_aq_init = cn20k_aura_aq_init,
 	.pool_aq_init = cn20k_pool_aq_init,
+	.pfaf_mbox_intr_handler = cn20k_pfaf_mbox_intr_handler,
 };
 
 int cn20k_init(struct otx2_nic *pfvf)
@@ -207,6 +208,7 @@ int cn20k_init(struct otx2_nic *pfvf)
 
 	return 0;
 }
+EXPORT_SYMBOL(cn20k_init);
 
 int cn20k_check_pf_usable(struct otx2_nic *nic)
 {
@@ -223,4 +225,53 @@ int cn20k_check_pf_usable(struct otx2_nic *nic)
 		return -EPROBE_DEFER;
 	}
 	return 0;
+}
+
+/* CN20K mbox AF => PFx irq handler */
+irqreturn_t cn20k_pfaf_mbox_intr_handler(int irq, void *pf_irq)
+{
+	struct otx2_nic *pf = (struct otx2_nic *)pf_irq;
+	struct mbox *mw = &pf->mbox;
+	struct otx2_mbox_dev *mdev;
+	struct otx2_mbox *mbox;
+	struct mbox_hdr *hdr;
+	int pf_trig_val;
+
+	pf_trig_val = otx2_read64(pf, RVU_PF_INT) & 0x3;
+
+	/* Clear the IRQ */
+	otx2_write64(pf, RVU_PF_INT, pf_trig_val);
+
+	if (pf_trig_val & BIT_ULL(0)) {
+		mbox = &mw->mbox_up;
+		mdev = &mbox->dev[0];
+		otx2_sync_mbox_bbuf(mbox, 0);
+
+		hdr = (struct mbox_hdr *)(mdev->mbase + mbox->rx_start);
+		if (hdr->num_msgs)
+			queue_work(pf->mbox_wq, &mw->mbox_up_wrk);
+
+		trace_otx2_msg_interrupt(pf->pdev, "UP message from AF to PF",
+					 BIT_ULL(0));
+
+		trace_otx2_msg_status(pf->pdev, "PF-AF up work queued(int)",
+				      hdr->num_msgs);
+	}
+
+	if (pf_trig_val & BIT_ULL(1)) {
+		mbox = &mw->mbox;
+		mdev = &mbox->dev[0];
+		otx2_sync_mbox_bbuf(mbox, 0);
+
+		hdr = (struct mbox_hdr *)(mdev->mbase + mbox->rx_start);
+		if (hdr->num_msgs)
+			queue_work(pf->mbox_wq, &mw->mbox_wrk);
+		trace_otx2_msg_interrupt(pf->pdev, "DOWN reply from AF to PF",
+					 BIT_ULL(1));
+
+		trace_otx2_msg_status(pf->pdev, "PF-AF down work queued(int)",
+				      hdr->num_msgs);
+	}
+
+	return IRQ_HANDLED;
 }

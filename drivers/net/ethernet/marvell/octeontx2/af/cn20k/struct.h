@@ -339,6 +339,19 @@ enum rvu_mbox_af_int_vec_e {
 	RVU_AF_INT_VEC_PFAF_MBOX1	= 0x7,
 	RVU_AF_INT_VEC_PFAF1_MBOX0	= 0x8,
 	RVU_AF_INT_VEC_PFAF1_MBOX1	= 0x9,
+	RVU_MBOX_AF_INT_VEC_CNT		= 0xa,
+};
+
+/**
+ * CN20k RVU PF MBOX Interrupt Vector Enumeration
+ */
+enum rvu_mbox_pf_int_vec_e {
+	RVU_MBOX_PF_INT_VEC_VFPF_MBOX0	= 0x4,
+	RVU_MBOX_PF_INT_VEC_VFPF_MBOX1	= 0x5,
+	RVU_MBOX_PF_INT_VEC_VFPF1_MBOX0	= 0x6,
+	RVU_MBOX_PF_INT_VEC_VFPF1_MBOX1	= 0x7,
+	RVU_MBOX_PF_INT_VEC_AFPF_MBOX	= 0x8,
+	RVU_MBOX_PF_INT_VEC_CNT		= 0x9,
 };
 
 #endif

@@ -57,6 +57,9 @@
 #define NIX_PF_PFC_PRIO_MAX			8
 #endif
 
+irqreturn_t otx2_pfaf_mbox_intr_handler(int irq, void *pf_irq);
+irqreturn_t cn20k_pfaf_mbox_intr_handler(int irq, void *pf_irq);
+
 enum arua_mapped_qtypes {
 	AURA_NIX_RQ,
 	AURA_NIX_SQ,
@@ -367,6 +370,7 @@ struct dev_hw_ops {
 	int	(*pool_aq_init)(struct otx2_nic *pfvf, u16 pool_id,
 				int stack_pages, int numptrs, int buf_size,
 				int type);
+	irqreturn_t (*pfaf_mbox_intr_handler)(int irq, void *pf_irq);
 };
 
 #define CN10K_MCS_SA_PER_SC	4
@@ -647,14 +651,6 @@ static inline void otx2_setup_dev_hw_settings(struct otx2_nic *pfvf)
 
 	if (is_dev_cn10kb(pfvf->pdev))
 		__set_bit(CN10K_HW_MACSEC, &hw->cap_flag);
-}
-
-static inline void otx2_setup_devops(struct otx2_nic *pfvf)
-{
-	if (is_cn20k(pfvf->pdev)) {
-		cn20k_init(pfvf);
-		return;
-	}
 }
 
 /* Register read/write APIs */
