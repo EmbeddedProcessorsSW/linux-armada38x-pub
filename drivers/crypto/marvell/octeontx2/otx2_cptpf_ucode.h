@@ -23,8 +23,11 @@
 /* Microcode version string length */
 #define OTX2_CPT_UCODE_VER_STR_SZ   44
 
-/* Maximum number of supported engines/cores on OcteonTX2/CN10K platform */
-#define OTX2_CPT_MAX_ENGINES        144
+/*
+ * Maximum number of supported engines/cores on OcteonTX2/CN10K/CN20K
+ * platform
+ */
+#define OTX2_CPT_MAX_ENGINES        256
 
 #define OTX2_CPT_ENGS_BITMASK_LEN   BITS_TO_LONGS(OTX2_CPT_MAX_ENGINES)
 
@@ -96,9 +99,11 @@ struct otx2_cpt_engs_available {
 	int max_se_cnt;
 	int max_ie_cnt;
 	int max_ae_cnt;
+	int max_re_cnt;
 	int se_cnt;
 	int ie_cnt;
 	int ae_cnt;
+	int re_cnt;
 };
 
 /* Engines reserved to an engine group */

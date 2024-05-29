@@ -305,7 +305,7 @@ union otx2_cptx_af_constants1 {
 		u64 se:16;
 		u64 ie:16;
 		u64 ae:16;
-		u64 reserved_48_63:16;
+		u64 re:16;
 	} s;
 };
 

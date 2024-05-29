@@ -36,6 +36,7 @@ enum otx2_cpt_eng_type {
 	OTX2_CPT_AE_TYPES = 1,
 	OTX2_CPT_SE_TYPES = 2,
 	OTX2_CPT_IE_TYPES = 3,
+	OTX2_CPT_RE_TYPES = 4,
 	OTX2_CPT_MAX_ENG_TYPES,
 };
 

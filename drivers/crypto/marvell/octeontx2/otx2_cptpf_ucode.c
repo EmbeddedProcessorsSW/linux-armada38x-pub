@@ -119,6 +119,36 @@ static char *get_ucode_type_str(int ucode_type)
 	return str;
 }
 
+static bool is_engine_type_supported(struct device *dev,
+				     struct otx2_cpt_eng_grps *eng_grps,
+				     enum otx2_cpt_eng_type etype)
+{
+	bool is_supported = false;
+
+	switch (etype) {
+	case OTX2_CPT_SE_TYPES:
+		is_supported = eng_grps->avail.max_se_cnt ? true : false;
+		break;
+
+	case OTX2_CPT_IE_TYPES:
+		is_supported = eng_grps->avail.max_ie_cnt ? true : false;
+		break;
+
+	case OTX2_CPT_AE_TYPES:
+		is_supported = eng_grps->avail.max_ae_cnt ? true : false;
+		break;
+
+	case OTX2_CPT_RE_TYPES:
+		/* RE engines are not supported */
+		break;
+
+	default:
+		dev_err(dev, "Invalid engine type %d\n", etype);
+		break;
+	}
+	return is_supported;
+}
+
 static int get_ucode_type(struct device *dev,
 			  struct otx2_cpt_ucode_hdr *ucode_hdr,
 			  int *ucode_type, u16 rid)
@@ -452,15 +482,19 @@ static void print_uc_info(struct fw_info_t *fw_info)
 }
 
 static int cpt_ucode_load_fw(struct pci_dev *pdev, struct fw_info_t *fw_info,
-			     u16 rid)
+			     struct otx2_cpt_eng_grps *eng_grps)
 {
 	char filename[OTX2_CPT_NAME_LENGTH];
+	u16 rid = eng_grps->rid;
 	char eng_type[8] = {0};
 	int ret, e, i;
 
 	INIT_LIST_HEAD(&fw_info->ucodes);
 
 	for (e = 1; e < OTX2_CPT_MAX_ENG_TYPES; e++) {
+		if (!is_engine_type_supported(&pdev->dev, eng_grps, e))
+			continue;
+
 		strcpy(eng_type, get_eng_type_str(e));
 		for (i = 0; i < strlen(eng_type); i++)
 			eng_type[i] = tolower(eng_type[i]);
@@ -534,6 +568,15 @@ static int update_engines_offset(struct device *dev,
 				 struct otx2_cpt_engs_available *avail,
 				 struct otx2_cpt_engs_rsvd *engs)
 {
+	/* 10x supports Symmetric Engines (SE), Ipsec Engines (IE) and
+	 * Asymmetric Engines (AE). 20x does not support IE engines while
+	 * it supports new engine type (RE) for quantum cryptography.
+	 * So, 20x does not support IE engines but support RE engines
+	 * and 10x does not support RE engines but support IE engines.
+	 * CPT have array of engines in which SE engines are at the
+	 * start, followed by IE (10x) or RE (20x) engines. AE engines
+	 * are after IE on 10x and after RE on 20x.
+	 */
 	switch (engs->type) {
 	case OTX2_CPT_SE_TYPES:
 		engs->offset = 0;
@@ -544,7 +587,8 @@ static int update_engines_offset(struct device *dev,
 		break;
 
 	case OTX2_CPT_AE_TYPES:
-		engs->offset = avail->max_se_cnt + avail->max_ie_cnt;
+		engs->offset = avail->max_se_cnt + avail->max_ie_cnt +
+				avail->max_re_cnt;
 		break;
 
 	default:
@@ -876,6 +920,10 @@ static int eng_grp_update_masks(struct device *dev,
 			max_cnt = eng_grp->g->avail.max_ae_cnt;
 			break;
 
+		case OTX2_CPT_RE_TYPES:
+			max_cnt = eng_grp->g->avail.max_re_cnt;
+			break;
+
 		default:
 			dev_err(dev, "Invalid engine type %d\n", engs->type);
 			return -EINVAL;
@@ -1159,7 +1207,7 @@ int otx2_cpt_create_eng_grps(struct otx2_cptpf_dev *cptpf,
 	if (eng_grps->is_grps_created)
 		goto unlock;
 
-	ret = cpt_ucode_load_fw(pdev, &fw_info, eng_grps->rid);
+	ret = cpt_ucode_load_fw(pdev, &fw_info, eng_grps);
 	if (ret)
 		goto unlock;
 
@@ -1185,23 +1233,25 @@ int otx2_cpt_create_eng_grps(struct otx2_cptpf_dev *cptpf,
 	 * Create engine group with SE+IE engines for IPSec.
 	 * All SE engines will be shared with engine group 0.
 	 */
-	uc_info[0] = get_ucode(&fw_info, OTX2_CPT_SE_TYPES);
-	uc_info[1] = get_ucode(&fw_info, OTX2_CPT_IE_TYPES);
+	if (eng_grps->avail.max_ie_cnt) {
+		uc_info[0] = get_ucode(&fw_info, OTX2_CPT_SE_TYPES);
+		uc_info[1] = get_ucode(&fw_info, OTX2_CPT_IE_TYPES);
 
-	if (uc_info[1] == NULL) {
-		dev_err(&pdev->dev, "Unable to find firmware for IE");
-		ret = -EINVAL;
-		goto delete_eng_grp;
+		if (!uc_info[1]) {
+			dev_err(&pdev->dev, "Unable to find firmware for IE");
+			ret = -EINVAL;
+			goto delete_eng_grp;
+		}
+		engs[0].type = OTX2_CPT_SE_TYPES;
+		engs[0].count = eng_grps->avail.max_se_cnt;
+		engs[1].type = OTX2_CPT_IE_TYPES;
+		engs[1].count = eng_grps->avail.max_ie_cnt;
+
+		ret = create_engine_group(&pdev->dev, eng_grps, engs, 2,
+					  (void **)uc_info, 1);
+		if (ret)
+			goto delete_eng_grp;
 	}
-	engs[0].type = OTX2_CPT_SE_TYPES;
-	engs[0].count = eng_grps->avail.max_se_cnt;
-	engs[1].type = OTX2_CPT_IE_TYPES;
-	engs[1].count = eng_grps->avail.max_ie_cnt;
-
-	ret = create_engine_group(&pdev->dev, eng_grps, engs, 2,
-				  (void **) uc_info, 1);
-	if (ret)
-		goto delete_eng_grp;
 
 	/*
 	 * Create engine group with AE engines for asymmetric
@@ -1337,7 +1387,8 @@ int otx2_cpt_disable_all_cores(struct otx2_cptpf_dev *cptpf)
 
 	total_cores = cptpf->eng_grps.avail.max_se_cnt +
 		      cptpf->eng_grps.avail.max_ie_cnt +
-		      cptpf->eng_grps.avail.max_ae_cnt;
+		      cptpf->eng_grps.avail.max_ae_cnt +
+		      cptpf->eng_grps.avail.max_re_cnt;
 
 	if (cptpf->has_cpt1) {
 		ret = cptx_disable_all_cores(cptpf, total_cores, BLKADDR_CPT1);
@@ -1377,10 +1428,13 @@ int otx2_cpt_init_eng_grps(struct pci_dev *pdev,
 	eng_grps->avail.se_cnt = eng_grps->avail.max_se_cnt;
 	eng_grps->avail.ie_cnt = eng_grps->avail.max_ie_cnt;
 	eng_grps->avail.ae_cnt = eng_grps->avail.max_ae_cnt;
+	eng_grps->avail.re_cnt = eng_grps->avail.max_re_cnt;
 
 	eng_grps->engs_num = eng_grps->avail.max_se_cnt +
 			     eng_grps->avail.max_ie_cnt +
-			     eng_grps->avail.max_ae_cnt;
+			     eng_grps->avail.max_ae_cnt +
+			     eng_grps->avail.max_re_cnt;
+
 	if (eng_grps->engs_num > OTX2_CPT_MAX_ENGINES) {
 		dev_err(&pdev->dev,
 			"Number of engines %d > than max supported %d\n",
@@ -1420,7 +1474,7 @@ static int create_eng_caps_discovery_grps(struct pci_dev *pdev,
 	int ret;
 
 	mutex_lock(&eng_grps->lock);
-	ret = cpt_ucode_load_fw(pdev, &fw_info, eng_grps->rid);
+	ret = cpt_ucode_load_fw(pdev, &fw_info, eng_grps);
 	if (ret) {
 		mutex_unlock(&eng_grps->lock);
 		return ret;
@@ -1454,19 +1508,22 @@ static int create_eng_caps_discovery_grps(struct pci_dev *pdev,
 	if (ret)
 		goto delete_eng_grp;
 
-	uc_info[0] = get_ucode(&fw_info, OTX2_CPT_IE_TYPES);
-	if (uc_info[0] == NULL) {
-		dev_err(&pdev->dev, "Unable to find firmware for IE\n");
-		ret = -EINVAL;
-		goto delete_eng_grp;
-	}
-	engs[0].type = OTX2_CPT_IE_TYPES;
-	engs[0].count = 2;
+	/* IE engines are not supported on all hardware */
+	if (eng_grps->avail.max_ie_cnt) {
+		uc_info[0] = get_ucode(&fw_info, OTX2_CPT_IE_TYPES);
+		if (!uc_info[0]) {
+			dev_err(&pdev->dev, "Unable to find firmware for IE\n");
+			ret = -EINVAL;
+			goto delete_eng_grp;
+		}
+		engs[0].type = OTX2_CPT_IE_TYPES;
+		engs[0].count = 2;
 
-	ret = create_engine_group(&pdev->dev, eng_grps, engs, 1,
-				  (void **) uc_info, 0);
-	if (ret)
-		goto delete_eng_grp;
+		ret = create_engine_group(&pdev->dev, eng_grps, engs, 1,
+					  (void **)uc_info, 0);
+		if (ret)
+			goto delete_eng_grp;
+	}
 
 	cpt_ucode_release_fw(&fw_info);
 	mutex_unlock(&eng_grps->lock);
@@ -1549,6 +1606,10 @@ int otx2_cpt_discover_eng_capabilities(struct otx2_cptpf_dev *cptpf)
 	iq_cmd.cptr.u = 0;
 
 	for (etype = 1; etype < OTX2_CPT_MAX_ENG_TYPES; etype++) {
+		if (!is_engine_type_supported(&pdev->dev, &cptpf->eng_grps,
+					      etype))
+			continue;
+
 		result->s.compcode = OTX2_CPT_COMPLETION_CODE_INIT;
 		iq_cmd.cptr.s.grp = otx2_cpt_get_eng_grp(&cptpf->eng_grps,
 							 etype);
@@ -1653,6 +1714,10 @@ int otx2_cpt_dl_custom_egrp_create(struct otx2_cptpf_dev *cptpf,
 			tmp = strsep(&val, ":");
 			if (!tmp)
 				goto err_print;
+			if (eng_grps->avail.max_ie_cnt) {
+				err_msg = "IE engine not supported";
+				goto err_print;
+			}
 			tmp = strim(tmp);
 			if (!val)
 				goto err_print;

@@ -17,6 +17,7 @@
 #define CPT_UC_RID_CN9K_B0   1
 #define CPT_UC_RID_CN10K_A   4
 #define CPT_UC_RID_CN10K_B   5
+#define CPT_UC_RID_CN20K     6
 
 static void cptpf_enable_vfpf_mbox_intr(struct otx2_cptpf_dev *cptpf,
 					int num_vfs)
@@ -780,6 +781,12 @@ static int cptpf_get_rid(struct pci_dev *pdev, struct otx2_cptpf_dev *cptpf)
 		eng_grps->rid = pdev->revision;
 		return 0;
 	}
+
+	if (is_cn20k(pdev)) {
+		eng_grps->rid = CPT_UC_RID_CN20K;
+		return 0;
+	}
+
 	otx2_cpt_read_af_reg(&cptpf->afpf_mbox, pdev, CPT_AF_CTL, &reg_val,
 			     BLKADDR_CPT0);
 	if ((cpt_feature_sgv2(pdev) && (reg_val & BIT_ULL(18))) ||
@@ -819,6 +826,7 @@ static int cptpf_device_init(struct otx2_cptpf_dev *cptpf)
 	cptpf->eng_grps.avail.max_se_cnt = af_cnsts1.s.se;
 	cptpf->eng_grps.avail.max_ie_cnt = af_cnsts1.s.ie;
 	cptpf->eng_grps.avail.max_ae_cnt = af_cnsts1.s.ae;
+	cptpf->eng_grps.avail.max_re_cnt = af_cnsts1.s.re;
 
 	/* Disable all cores */
 	ret = otx2_cpt_disable_all_cores(cptpf);
