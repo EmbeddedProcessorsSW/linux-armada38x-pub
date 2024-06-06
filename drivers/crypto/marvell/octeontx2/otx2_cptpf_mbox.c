@@ -472,6 +472,54 @@ irqreturn_t otx2_cptpf_afpf_mbox_intr(int __always_unused irq, void *arg)
 	return IRQ_HANDLED;
 }
 
+/* CN20K mbox AF <==> PF irq handler */
+irqreturn_t cptpf_cn20k_afpf_mbox_intr(int __always_unused irq, void *arg)
+{
+	struct otx2_cptpf_dev *cptpf = arg;
+	struct otx2_mbox_dev *mdev;
+	struct otx2_mbox *mbox;
+	struct mbox_hdr *hdr;
+	u64 intr;
+
+	/* Read the interrupt bits */
+	intr = otx2_cpt_read64(cptpf->reg_base, BLKADDR_RVUM, 0, RVU_PF_INT);
+	intr &= GENMASK_ULL(1, 0);
+
+	/* Clear and ack the interrupt */
+	otx2_cpt_write64(cptpf->reg_base, BLKADDR_RVUM, 0, RVU_PF_INT, intr);
+
+	if (intr & BIT_ULL(0)) {
+		mbox = &cptpf->afpf_mbox_up;
+		mdev = &mbox->dev[0];
+
+		otx2_cpt_sync_mbox_bbuf(mbox, 0);
+
+		hdr = mdev->mbase + mbox->rx_start;
+		if (hdr->num_msgs)
+			/* Schedule workqueue function to process the
+			 * MBOX request
+			 */
+			queue_work(cptpf->afpf_mbox_wq,
+				   &cptpf->afpf_mbox_up_work);
+	}
+
+	if (intr & BIT_ULL(1)) {
+		mbox = &cptpf->afpf_mbox;
+		mdev = &mbox->dev[0];
+
+		otx2_cpt_sync_mbox_bbuf(mbox, 0);
+
+		hdr = mdev->mbase + mbox->rx_start;
+		if (hdr->num_msgs)
+			/* Schedule work queue function to process the
+			 * MBOX request
+			 */
+			queue_work(cptpf->afpf_mbox_wq, &cptpf->afpf_mbox_work);
+	}
+
+	return IRQ_HANDLED;
+}
+
 static void process_afpf_mbox_msg(struct otx2_cptpf_dev *cptpf,
 				  struct mbox_msghdr *msg)
 {

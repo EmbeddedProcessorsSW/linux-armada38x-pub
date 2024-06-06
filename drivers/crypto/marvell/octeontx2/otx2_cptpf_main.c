@@ -414,10 +414,11 @@ static void cptpf_vfpf_mbox_destroy(struct otx2_cptpf_dev *cptpf)
 static void cptpf_disable_afpf_mbox_intr(struct otx2_cptpf_dev *cptpf)
 {
 	/* Disable AF-PF interrupt */
-	otx2_cpt_write64(cptpf->reg_base, BLKADDR_RVUM, 0, RVU_PF_INT_ENA_W1C,
-			 0x1ULL);
+	otx2_cpt_write64(cptpf->reg_base, BLKADDR_RVUM, 0,
+			 RVU_PF_INT_ENA_W1C, BIT_ULL(0) | BIT_ULL(1));
 	/* Clear interrupt if any */
-	otx2_cpt_write64(cptpf->reg_base, BLKADDR_RVUM, 0, RVU_PF_INT, 0x1ULL);
+	otx2_cpt_write64(cptpf->reg_base, BLKADDR_RVUM, 0,
+			 RVU_PF_INT, BIT_ULL(0) | BIT_ULL(1));
 }
 
 static int cptpf_register_afpf_mbox_intr(struct otx2_cptpf_dev *cptpf)
@@ -426,20 +427,28 @@ static int cptpf_register_afpf_mbox_intr(struct otx2_cptpf_dev *cptpf)
 	struct device *dev = &pdev->dev;
 	int ret, irq;
 
-	irq = pci_irq_vector(pdev, RVU_PF_INT_VEC_AFPF_MBOX);
-	/* Register AF-PF mailbox interrupt handler */
-	ret = devm_request_irq(dev, irq, otx2_cptpf_afpf_mbox_intr, 0,
-			       "CPTAFPF Mbox", cptpf);
+	if (is_cn20k(cptpf->pdev)) {
+		irq = pci_irq_vector(pdev, RVU_MBOX_PF_INT_VEC_AFPF_MBOX);
+		/* Register AF-PF mailbox interrupt handler */
+		ret = devm_request_irq(dev, irq,
+				       cptpf_cn20k_afpf_mbox_intr, 0,
+				       "CPTAFPF Mbox", cptpf);
+	} else {
+		irq = pci_irq_vector(pdev, RVU_PF_INT_VEC_AFPF_MBOX);
+		/* Register AF-PF mailbox interrupt handler */
+		ret = devm_request_irq(dev, irq, otx2_cptpf_afpf_mbox_intr, 0,
+				       "CPTAFPF Mbox", cptpf);
+	}
 	if (ret) {
-		dev_err(dev,
-			"IRQ registration failed for PFAF mbox irq\n");
+		dev_err(dev, "IRQ registration failed for PFAF mbox irq\n");
 		return ret;
 	}
 	/* Clear interrupt if any, to avoid spurious interrupts */
-	otx2_cpt_write64(cptpf->reg_base, BLKADDR_RVUM, 0, RVU_PF_INT, 0x1ULL);
+	otx2_cpt_write64(cptpf->reg_base, BLKADDR_RVUM, 0,
+			 RVU_PF_INT, BIT_ULL(0) | BIT_ULL(1));
 	/* Enable AF-PF interrupt */
-	otx2_cpt_write64(cptpf->reg_base, BLKADDR_RVUM, 0, RVU_PF_INT_ENA_W1S,
-			 0x1ULL);
+	otx2_cpt_write64(cptpf->reg_base, BLKADDR_RVUM, 0,
+			 RVU_PF_INT_ENA_W1S, BIT_ULL(0) | BIT_ULL(1));
 
 	ret = otx2_cpt_send_ready_msg(&cptpf->afpf_mbox, cptpf->pdev);
 	if (ret) {
@@ -463,13 +472,22 @@ static int cptpf_afpf_mbox_init(struct otx2_cptpf_dev *cptpf)
 	if (!cptpf->afpf_mbox_wq)
 		return -ENOMEM;
 
-	offset = pci_resource_start(pdev, PCI_MBOX_BAR_NUM);
-	/* Map AF-PF mailbox memory */
-	cptpf->afpf_mbox_base = devm_ioremap_wc(&pdev->dev, offset, MBOX_SIZE);
-	if (!cptpf->afpf_mbox_base) {
-		dev_err(&pdev->dev, "Unable to map BAR4\n");
-		err = -ENOMEM;
-		goto error;
+	if (is_cn20k(cptpf->pdev)) {
+		cptpf->afpf_mbox_base = cptpf->reg_base +
+					CPT_CN20K_PFAF_MBOX_BASE +
+					((u64)BLKADDR_MBOX <<
+					OTX2_CPT_RVU_FUNC_BLKADDR_SHIFT);
+	} else {
+		offset = pci_resource_start(pdev, PCI_MBOX_BAR_NUM);
+
+		/* Map AF-PF mailbox memory */
+		cptpf->afpf_mbox_base = devm_ioremap_wc(&pdev->dev, offset,
+							MBOX_SIZE);
+		if (!cptpf->afpf_mbox_base) {
+			dev_err(&pdev->dev, "Unable to map BAR4\n");
+			err = -ENOMEM;
+			goto error;
+		}
 	}
 
 	err = otx2_mbox_init(&cptpf->afpf_mbox, cptpf->afpf_mbox_base,
@@ -574,9 +592,15 @@ static int cpt_is_pf_usable(struct otx2_cptpf_dev *cptpf)
 {
 	u64 rev;
 
-	rev = otx2_cpt_read64(cptpf->reg_base, BLKADDR_RVUM, 0,
-			      RVU_PF_BLOCK_ADDRX_DISC(BLKADDR_RVUM));
-	rev = (rev >> 12) & 0xFF;
+	if (is_cn20k(cptpf->pdev)) {
+		rev = otx2_cpt_read64(cptpf->reg_base, BLKADDR_RVUM, 0,
+				      RVU_PF_DISC);
+		rev = FIELD_GET(BIT_ULL(BLKADDR_RVUM), rev);
+	} else {
+		rev = otx2_cpt_read64(cptpf->reg_base, BLKADDR_RVUM, 0,
+				      RVU_PF_BLOCK_ADDRX_DISC(BLKADDR_RVUM));
+		rev = FIELD_GET(GENMASK(19, 12), rev);
+	}
 	/*
 	 * Check if AF has setup revision for RVUM block, otherwise
 	 * driver probe should be deferred until AF driver comes up
