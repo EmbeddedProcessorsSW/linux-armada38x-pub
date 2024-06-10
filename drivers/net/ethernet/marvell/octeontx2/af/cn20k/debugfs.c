@@ -121,6 +121,8 @@ void print_nix_cn20k_cq_ctx(struct seq_file *m,
 
 	seq_printf(m, "W3: cpt_drop_err_en \t\t\t%d\n",
 		   cq_ctx->cpt_drop_err_en);
+	seq_printf(m, "W3: ena \t\t\t%d\n",
+		   cq_ctx->ena);
 	seq_printf(m, "W3: drop_ena \t\t\t%d\nW3: drop \t\t\t%d\n",
 		   cq_ctx->drop_ena, cq_ctx->drop);
 	seq_printf(m, "W3: bp \t\t\t\t%d\n\n", cq_ctx->bp);
