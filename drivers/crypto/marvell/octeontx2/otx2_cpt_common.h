@@ -222,6 +222,7 @@ static inline bool cpt_feature_sgv2(struct pci_dev *pdev)
 
 int otx2_cpt_send_ready_msg(struct otx2_mbox *mbox, struct pci_dev *pdev);
 int otx2_cpt_send_mbox_msg(struct otx2_mbox *mbox, struct pci_dev *pdev);
+void otx2_cpt_sync_mbox_bbuf(struct otx2_mbox *mbox, int devid);
 
 int otx2_cpt_send_af_reg_requests(struct otx2_mbox *mbox,
 				  struct pci_dev *pdev);

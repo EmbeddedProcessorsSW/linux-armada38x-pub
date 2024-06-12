@@ -19,6 +19,27 @@
 	(opcode);                                       \
 })
 
+int otx2_cptpf_mbox_bbuf_init(struct otx2_cptpf_dev *cptpf,
+			      struct pci_dev *pdev)
+{
+	struct otx2_mbox_dev *mdev;
+	struct otx2_mbox *otx2_mbox;
+
+	cptpf->afpf_bbuf_base = devm_kmalloc(&pdev->dev, MBOX_SIZE, GFP_KERNEL);
+	if (!cptpf->afpf_bbuf_base)
+		return -ENOMEM;
+	/*
+	 * Overwrite mbox mbase to point to bounce buffer, so that PF/VF
+	 * prepare all mbox messages in bounce buffer instead of directly
+	 * in hw mbox memory.
+	 */
+	otx2_mbox = &cptpf->afpf_mbox;
+	mdev = &otx2_mbox->dev[0];
+	mdev->mbase = cptpf->afpf_bbuf_base;
+
+	return 0;
+}
+
 /*
  * CPT PF driver version, It will be incremented by 1 for every feature
  * addition in CPT mailbox messages.
@@ -427,6 +448,9 @@ irqreturn_t otx2_cptpf_afpf_mbox_intr(int __always_unused irq, void *arg)
 	if (intr & 0x1ULL) {
 		mbox = &cptpf->afpf_mbox;
 		mdev = &mbox->dev[0];
+
+		otx2_cpt_sync_mbox_bbuf(mbox, 0);
+
 		hdr = mdev->mbase + mbox->rx_start;
 		if (hdr->num_msgs)
 			/* Schedule work queue function to process the MBOX request */
@@ -434,6 +458,9 @@ irqreturn_t otx2_cptpf_afpf_mbox_intr(int __always_unused irq, void *arg)
 
 		mbox = &cptpf->afpf_mbox_up;
 		mdev = &mbox->dev[0];
+
+		otx2_cpt_sync_mbox_bbuf(mbox, 0);
+
 		hdr = mdev->mbase + mbox->rx_start;
 		if (hdr->num_msgs)
 			/* Schedule work queue function to process the MBOX request */

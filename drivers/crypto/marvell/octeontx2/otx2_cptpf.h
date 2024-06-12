@@ -43,6 +43,7 @@ struct otx2_cptpf_dev {
 
 	struct otx2_mbox	afpf_mbox_up;
 	struct work_struct	afpf_mbox_up_work;
+	void *afpf_bbuf_base;		/* Bounce buffer for AF <=> PF mbox */
 
 	/* VF <=> PF mbox */
 	struct otx2_mbox	vfpf_mbox;
@@ -66,6 +67,8 @@ struct otx2_cptpf_dev {
 };
 
 irqreturn_t otx2_cptpf_afpf_mbox_intr(int irq, void *arg);
+int otx2_cptpf_mbox_bbuf_init(struct otx2_cptpf_dev *cptpf,
+			      struct pci_dev *pdev);
 void otx2_cptpf_afpf_mbox_handler(struct work_struct *work);
 void otx2_cptpf_afpf_mbox_up_handler(struct work_struct *work);
 irqreturn_t otx2_cptpf_vfpf_mbox_intr(int irq, void *arg);

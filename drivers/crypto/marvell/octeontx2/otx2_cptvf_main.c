@@ -109,7 +109,7 @@ static int cptvf_pfvf_mbox_init(struct otx2_cptvf_dev *cptvf)
 	if (ret)
 		goto free_wqe;
 
-	ret = otx2_cpt_mbox_bbuf_init(cptvf, pdev);
+	ret = otx2_cptvf_mbox_bbuf_init(cptvf, pdev);
 	if (ret)
 		goto destroy_mbox;
 
