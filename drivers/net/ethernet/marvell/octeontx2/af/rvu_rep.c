@@ -32,84 +32,31 @@ static struct _req_type __maybe_unused					\
 MBOX_UP_REP_MESSAGES
 #undef M
 
-int rvu_rep_notify_representee_state(struct rvu *rvu, u16 pcifunc, bool enable)
+static int rvu_rep_up_notify(struct rvu *rvu, struct rep_event *event)
 {
-	struct rep_repte_req *req;
-	int pf;
-
-	if (!is_pf_cgxmapped(rvu, rvu_get_pf(pcifunc)))
-		return 0;
-
-	pf = rvu_get_pf(rvu->rep_pcifunc);
-
-	req = otx2_mbox_alloc_msg_rep_repte_notify(rvu, pf);
-	if (!req)
-		return -ENOMEM;
-
-	req->hdr.pcifunc = rvu->rep_pcifunc;
-	req->enable = enable;
-	req->repte_pcifunc = pcifunc;
-
-	otx2_mbox_wait_for_zero(&rvu->afpf_wq_info.mbox_up, pf);
-
-	otx2_mbox_msg_send_up(&rvu->afpf_wq_info.mbox_up, pf);
-
-	return 0;
-}
-
-static int rvu_rep_notify_vf(struct rvu *rvu, struct rep_event *event)
-{
-	struct rep_state *msg;
+	struct rep_event *msg;
 	int pf;
 
 	pf = rvu_get_pf(event->pcifunc);
 
+	if (event->event & RVU_EVENT_PFVF_STATE)
+		pf = rvu_get_pf(event->hdr.pcifunc);
+
 	mutex_lock(&rvu->mbox_lock);
-	msg = otx2_mbox_alloc_msg_rep_state_event(rvu, pf);
-	if (!msg)
+	msg = otx2_mbox_alloc_msg_rep_event_up_notify(rvu, pf);
+	if (!msg) {
+		mutex_unlock(&rvu->mbox_lock);
 		return -ENOMEM;
-
-	msg->hdr.pcifunc = event->pcifunc;
-	if (event->flags & RVU_REP_UP)
-		msg->intf_up = 1;
-
-	otx2_mbox_wait_for_zero(&rvu->afpf_wq_info.mbox_up, pf);
-
-	otx2_mbox_msg_send_up(&rvu->afpf_wq_info.mbox_up, pf);
-
-	mutex_unlock(&rvu->mbox_lock);
-	return 0;
-}
-
-bool is_mapped_to_rep(struct rvu *rvu, u16 pcifunc, u16 *rep_id)
-{
-	int id;
-
-	for (id = 0; id < rvu->rep_cnt; id++) {
-		if (rvu->rep2pfvf_map[id] == pcifunc) {
-			*rep_id = id;
-			return true;
-		}
 	}
 
-	return false;
-}
-
-static int rvu_rep_notify_mtu(struct rvu *rvu, struct rep_event *event)
-{
-	struct rep_mtu *msg;
-	int pf;
-
-	pf = rvu_get_pf(rvu->rep_pcifunc);
-
-	mutex_lock(&rvu->mbox_lock);
-	msg = otx2_mbox_alloc_msg_rep_set_mtu(rvu, pf);
-	if (!msg)
-		return -ENOMEM;
-
 	msg->hdr.pcifunc = event->pcifunc;
-	msg->rep_id = event->rep_id;
-	msg->mtu = event->mtu;
+	msg->event = event->event;
+	msg->pcifunc = event->pcifunc;
+
+	if (event->event & RVU_EVENT_PFVF_STATE)
+		msg->hdr.pcifunc = event->hdr.pcifunc;
+
+	memcpy(&msg->evt_data, &event->evt_data, sizeof(struct rep_evt_data));
 
 	otx2_mbox_wait_for_zero(&rvu->afpf_wq_info.mbox_up, pf);
 
@@ -139,33 +86,10 @@ static void rvu_rep_wq_handler(struct work_struct *work)
 			break; /* nothing more to process */
 
 		event = &qentry->event;
-		if (event->flags == RVU_REP_MTU)
-			rvu_rep_notify_mtu(rvu, event);
-		else
-			rvu_rep_notify_vf(rvu, event);
 
+		rvu_rep_up_notify(rvu, event);
 		kfree(qentry);
 	} while (1);
-}
-
-int rvu_rep_mtu_event_notify(struct rvu *rvu, u16 mtu, u16 pcifunc, u16 rep_id)
-{
-	struct rep_evtq_ent *qentry;
-
-	qentry = kmalloc(sizeof(*qentry), GFP_ATOMIC);
-	if (!qentry)
-		return -ENOMEM;
-
-	qentry->event.hdr.pcifunc = rvu->rep_pcifunc;
-	qentry->event.pcifunc = rvu->rep_pcifunc;
-	qentry->event.rep_id = rep_id;
-	qentry->event.mtu = mtu;
-	qentry->event.flags = RVU_REP_MTU;
-	spin_lock(&rvu->rep_evtq_lock);
-	list_add_tail(&qentry->node, &rvu->rep_evtq_head);
-	spin_unlock(&rvu->rep_evtq_lock);
-	queue_work(rvu->rep_evt_wq, &rvu->rep_evt_work);
-	return 0;
 }
 
 int rvu_mbox_handler_rep_event_notify(struct rvu *rvu, struct rep_event *req,
@@ -183,6 +107,21 @@ int rvu_mbox_handler_rep_event_notify(struct rvu *rvu, struct rep_event *req,
 	spin_unlock(&rvu->rep_evtq_lock);
 	queue_work(rvu->rep_evt_wq, &rvu->rep_evt_work);
 	return 0;
+}
+
+int rvu_rep_notify_pfvf_state(struct rvu *rvu, u16 pcifunc, bool enable)
+{
+	struct rep_event req;
+	struct msg_rsp rsp;
+
+	if (!is_pf_cgxmapped(rvu, rvu_get_pf(pcifunc)))
+		return 0;
+
+	req.hdr.pcifunc = rvu->rep_pcifunc;
+	req.event |= RVU_EVENT_PFVF_STATE;
+	req.pcifunc = pcifunc;
+	req.evt_data.vf_state = enable;
+	return rvu_mbox_handler_rep_event_notify(rvu, &req, &rsp);
 }
 
 static u16 rvu_rep_get_vlan_id(struct rvu *rvu, u16 pcifunc)
@@ -331,6 +270,7 @@ int rvu_rep_install_mcam_rules(struct rvu *rvu)
 
 		pcifunc = pf << RVU_PFVF_PF_SHIFT;
 		rvu_get_nix_blkaddr(rvu, pcifunc);
+		rvu_switch_enable_lbk_link(rvu, pcifunc, true);
 		rep = true;
 		for (i = 0; i < 2; i++) {
 			err = rvu_rep_install_rx_rule(rvu, pcifunc, start + entry, rep);
@@ -349,6 +289,7 @@ int rvu_rep_install_mcam_rules(struct rvu *rvu)
 		for (vf = 0; vf < numvfs; vf++) {
 			pcifunc = pf << RVU_PFVF_PF_SHIFT |
 				  ((vf + 1) & RVU_PFVF_FUNC_MASK);
+			rvu_switch_enable_lbk_link(rvu, pcifunc, true);
 			rvu_get_nix_blkaddr(rvu, pcifunc);
 
 			/* Skip installimg rules if nixlf is not attached */

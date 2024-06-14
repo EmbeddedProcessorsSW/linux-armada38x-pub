@@ -36,6 +36,8 @@ struct rep_dev {
 	struct delayed_work stats_wrk;
 	u16 rep_id;
 	u16 pcifunc;
+#define RVU_REP_VF_INITIALIZED		BIT_ULL(0)
+	u8 flags;
 };
 
 static inline bool otx2_rep_dev(struct pci_dev *pdev)
@@ -45,4 +47,5 @@ static inline bool otx2_rep_dev(struct pci_dev *pdev)
 
 int rvu_rep_create(struct otx2_nic *priv, struct netlink_ext_ack *extack);
 void rvu_rep_destroy(struct otx2_nic *priv);
+int rvu_event_up_notify(struct otx2_nic *pf, struct rep_event *info);
 #endif /* REP_H */
