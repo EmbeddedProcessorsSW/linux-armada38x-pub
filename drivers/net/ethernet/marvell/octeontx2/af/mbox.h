@@ -1545,6 +1545,7 @@ struct nix_set_vlan_tpid {
 struct nix_get_lf_stats_req {
 	struct mbox_msghdr hdr;
 	u16 pcifunc;
+	u8 reset;
 	u64 rsvd;
 };
 

@@ -4184,11 +4184,17 @@ int rvu_mbox_handler_nix_get_lf_stats(struct rvu *rvu,
 {
 	u16 pcifunc = req->pcifunc;
 	int nixlf, blkaddr, err;
+	struct msg_req rst_req;
+	struct msg_rsp rst_rsp;
 
 	err = nix_get_nixlf(rvu, pcifunc, &nixlf, &blkaddr);
 	if (err)
 		return 0;
 
+	if (req->reset) {
+		rst_req.hdr.pcifunc = pcifunc;
+		return rvu_mbox_handler_nix_stats_rst(rvu, &rst_req, &rst_rsp);
+	}
 	rsp->rx.octs = RVU_LF_RX_STATS(RX_OCTS);
 	rsp->rx.ucast = RVU_LF_RX_STATS(RX_UCAST);
 	rsp->rx.bcast = RVU_LF_RX_STATS(RX_BCAST);
