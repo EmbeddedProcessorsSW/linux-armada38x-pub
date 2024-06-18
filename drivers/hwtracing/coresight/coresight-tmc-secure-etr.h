@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-2.0 */
+/* Copyright (C) 2024 Marvell. */
 #ifndef _CORESIGHT_TMC_SECURE_ETR_H
 #define _CORESIGHT_TMC_SECURE_ETR_H
 
