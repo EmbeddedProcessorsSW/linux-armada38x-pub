@@ -2200,6 +2200,14 @@ static int cgx_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	cgx->cgx_id = (pci_resource_start(pdev, PCI_CFG_REG_BAR_NUM) >> 24)
 		& CGX_ID_MASK;
 
+	if (is_cn20k(pdev)) {
+		err = pci_read_config_byte(pdev, PCI_REVISION_ID, &cgx->cgx_id);
+		if (err) {
+			dev_err(dev, "Unable to set CGX id\n");
+			return err;
+		}
+	}
+
 	 /* Skip probe if CGX is not mapped to NIX */
 	if (!is_cn20k(pdev) && !is_cgx_mapped_to_nix(pdev->subsystem_device, cgx->cgx_id)) {
 		dev_notice(dev, "CGX %d not mapped to NIX, skipping probe\n", cgx->cgx_id);
