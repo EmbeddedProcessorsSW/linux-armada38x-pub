@@ -299,8 +299,9 @@ struct smc_update_obj_info {
 
 #define UPDATE_MAGIC		0x55504454	/* UPDT */
 /** Current smc_update_descriptor version */
-#define UPDATE_VERSION		0x0100
-#define UPDATE_VERSION_PREV         0x0001
+#define UPDATE_VERSION			0x0201
+#define UPDATE_VERSION_100		0x0100
+#define UPDATE_VERSION_PREV		0x0001
 
 #define UPDATE_FLAG_BACKUP	   0x0001	/** Set to update secondary location */
 #define UPDATE_FLAG_EMMC	   0x0002	/** Set to update eMMC instead of SPI */
@@ -315,6 +316,7 @@ struct smc_update_obj_info {
 #define UPDATE_FLAG_USER_PARMS	0x8000
 /** Compatibility flag */
 #define UPDATE_COMPAT_FLAG_USE_OLD_VERSION_BEFORE_LOG	BIT(0)
+#define UPDATE_COMPAT_FLAG_USE_OLD_VERSION_100			BIT(1)
 
 /** Offset from the beginning of the flash where the backup image is located */
 #define BACKUP_IMAGE_OFFSET	0x2000000
@@ -343,6 +345,26 @@ struct smc_update_descriptor {
 	struct smc_update_obj_info object_retinfo[SMC_MAX_OBJECTS];
 };
 
+struct smc_update_descriptor_100 {
+	uint32_t	magic;		/** UPDATE_MAGIC */
+	uint16_t	version;	/** Version of descriptor */
+	uint16_t	update_flags;	/** Flags passed to update process */
+	uint64_t	image_addr;	/** Address of image (CPIO file) */
+	uint64_t	image_size;	/** Size of image (CPIO file) */
+	uint32_t	bus;		/** SPI BUS number */
+	uint32_t	cs;		/** SPI chip select number */
+	uint32_t	async_spi;      /** Async SPI operations */
+	uint32_t	retcode;	/** Retcode for async operations */
+	uint64_t	user_addr;	/** Passed to customer function */
+	uint64_t	user_size;	/** Passed to customer function */
+	uint64_t	user_flags;	/** Passed to customer function */
+	uintptr_t	work_buffer;	/** Used for compressed objects */
+	uint64_t	work_buffer_size;/** Size of work buffer */
+	uintptr_t	output_console;	/** Text output console for update info */
+	uint32_t	output_console_size;/** Console buffer size in bytes */
+	uint32_t	output_console_end;/** Not used yet */
+	uint64_t	reserved2[8];
+};
 
 struct smc_update_descriptor_prev {
 	uint32_t	magic;		/** UPDATE_MAGIC */

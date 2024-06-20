@@ -474,6 +474,11 @@ static int mrvl_run_fw_update(unsigned long arg)
 		res_update = mrvl_exec_smc(PLAT_OCTEONTX_SPI_SECURE_UPDATE,
 			    memdesc[BUF_DATA].phys,
 			    sizeof(struct smc_update_descriptor_prev));
+	} else if (ioctl_desc.compatibility_flags & UPDATE_COMPAT_FLAG_USE_OLD_VERSION_100) {
+		smc_desc->version = UPDATE_VERSION_100;
+		res_update = mrvl_exec_smc(PLAT_OCTEONTX_SPI_SECURE_UPDATE,
+			    memdesc[BUF_DATA].phys,
+			    sizeof(struct smc_update_descriptor_100));
 	} else {
 		res_update = mrvl_exec_smc(PLAT_OCTEONTX_SPI_SECURE_UPDATE,
 			    memdesc[BUF_DATA].phys,
