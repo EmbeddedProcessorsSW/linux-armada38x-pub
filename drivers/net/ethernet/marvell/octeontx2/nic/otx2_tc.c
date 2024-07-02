@@ -440,6 +440,7 @@ static int otx2_tc_parse_actions(struct otx2_nic *nic,
 	bool pps = false, mcast = false;
 	struct flow_action_entry *act;
 	struct net_device *target;
+	struct rep_dev *rdev;
 	struct otx2_nic *priv;
 	u32 burst, mark = 0;
 	u8 nr_police = 0;
@@ -463,14 +464,20 @@ static int otx2_tc_parse_actions(struct otx2_nic *nic,
 			return 0;
 		case FLOW_ACTION_REDIRECT_INGRESS:
 			target = act->dev;
-			priv = netdev_priv(target);
-			/* npc_install_flow_req doesn't support passing a target pcifunc */
-			if (rvu_get_pf(nic->pcifunc) != rvu_get_pf(priv->pcifunc)) {
-				NL_SET_ERR_MSG_MOD(extack,
-						   "can't redirect to other pf/vf");
-				return -EOPNOTSUPP;
+
+			if (!target->dev.parent) {
+				priv = netdev_priv(target);
+				/* npc_install_flow_req doesn't support passing a target pcifunc */
+				if (rvu_get_pf(nic->pcifunc) != rvu_get_pf(priv->pcifunc)) {
+					NL_SET_ERR_MSG_MOD(extack,
+							   "can't redirect to other pf/vf");
+					return -EOPNOTSUPP;
+				}
+				req->vf = priv->pcifunc & RVU_PFVF_FUNC_MASK;
+			} else {
+				rdev = netdev_priv(target);
+				req->vf = rdev->pcifunc & RVU_PFVF_FUNC_MASK;
 			}
-			req->vf = priv->pcifunc & RVU_PFVF_FUNC_MASK;
 
 			/* if op is already set; avoid overwriting the same */
 			if (!req->op)
