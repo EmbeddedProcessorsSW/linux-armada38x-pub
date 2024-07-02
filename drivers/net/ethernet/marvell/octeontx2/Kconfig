@@ -54,3 +54,11 @@ config OCTEONTX2_BPHY_RFOE_NETDEV
 	  This driver provides support for processing packets received/sent by
 	  BPHY RFOE MHAB such as eCPRI control, PTP and other ethernet packets
 	  in Linux kernel. The rest of packets are processed by ODP application.
+
+config RVU_ESWITCH
+	tristate "Marvell RVU E-Switch support"
+	depends on OCTEONTX2_PF
+	default m
+	help
+	  This driver supports Marvell's RVU E-Switch that
+	  provides internal SRIOV packet steering and switching.
