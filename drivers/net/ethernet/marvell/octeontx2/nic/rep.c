@@ -64,6 +64,9 @@ static void rvu_rep_state_evt_handler(struct otx2_nic *priv,
 	struct rep_dev *rep;
 	int rep_id;
 
+	if (priv->flags & OTX2_FLAG_INTF_DOWN)
+		return;
+
 	rep_id = rvu_rep_get_repid(priv, info->pcifunc);
 	rep = priv->reps[rep_id];
 	if (info->evt_data.vf_state)

@@ -391,7 +391,7 @@ static int nix_interface_init(struct rvu *rvu, u16 pcifunc, int type, int nixlf,
 		}
 
 		/* Notify RVU REP PF about representee coming up */
-		if (rvu->rep_mode)
+		if (rvu->rep_cnt)
 			rvu_rep_notify_pfvf_state(rvu, pcifunc, true);
 
 		break;
@@ -531,7 +531,7 @@ static void nix_interface_deinit(struct rvu *rvu, u16 pcifunc, u8 nixlf)
 	/* Disable DMAC filters used */
 	rvu_cgx_disable_dmac_entries(rvu, pcifunc);
 	/* Notify RVU REP PF about representee going down */
-	if (rvu->rep_mode)
+	if (rvu->rep_cnt)
 		rvu_rep_notify_pfvf_state(rvu, pcifunc, false);
 }
 

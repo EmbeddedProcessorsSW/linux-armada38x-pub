@@ -118,7 +118,7 @@ int rvu_rep_notify_pfvf_state(struct rvu *rvu, u16 pcifunc, bool enable)
 		return 0;
 
 	req.hdr.pcifunc = rvu->rep_pcifunc;
-	req.event |= RVU_EVENT_PFVF_STATE;
+	req.event = RVU_EVENT_PFVF_STATE;
 	req.pcifunc = pcifunc;
 	req.evt_data.vf_state = enable;
 	return rvu_mbox_handler_rep_event_notify(rvu, &req, &rsp);
@@ -260,6 +260,7 @@ int rvu_rep_install_mcam_rules(struct rvu *rvu)
 	u16 start = rswitch->start_entry;
 	struct rvu_hwinfo *hw = rvu->hw;
 	u16 pcifunc, entry = 0;
+	struct rvu_pfvf *pfvf;
 	int pf, vf, numvfs;
 	int err, nixlf, i;
 	u8 rep;
@@ -269,8 +270,10 @@ int rvu_rep_install_mcam_rules(struct rvu *rvu)
 			continue;
 
 		pcifunc = pf << RVU_PFVF_PF_SHIFT;
+		pfvf = rvu_get_pfvf(rvu, pcifunc);
 		rvu_get_nix_blkaddr(rvu, pcifunc);
-		rvu_switch_enable_lbk_link(rvu, pcifunc, true);
+		if (test_bit(NIXLF_INITIALIZED, &pfvf->flags))
+			rvu_switch_enable_lbk_link(rvu, pcifunc, true);
 		rep = true;
 		for (i = 0; i < 2; i++) {
 			err = rvu_rep_install_rx_rule(rvu, pcifunc, start + entry, rep);
@@ -289,7 +292,10 @@ int rvu_rep_install_mcam_rules(struct rvu *rvu)
 		for (vf = 0; vf < numvfs; vf++) {
 			pcifunc = pf << RVU_PFVF_PF_SHIFT |
 				  ((vf + 1) & RVU_PFVF_FUNC_MASK);
-			rvu_switch_enable_lbk_link(rvu, pcifunc, true);
+
+			pfvf = rvu_get_pfvf(rvu, pcifunc);
+			if (test_bit(NIXLF_INITIALIZED, &pfvf->flags))
+				rvu_switch_enable_lbk_link(rvu, pcifunc, true);
 			rvu_get_nix_blkaddr(rvu, pcifunc);
 
 			/* Skip installimg rules if nixlf is not attached */
