@@ -582,6 +582,7 @@ struct otx2_nic {
 	u16			rep_pf_map[RVU_MAX_REP];
 	u16			esw_mode;
 #endif
+	unsigned long		*af_xdp_zc_qidx;
 };
 
 static inline bool is_otx2_lbkvf(struct pci_dev *pdev)
@@ -1037,7 +1038,7 @@ void otx2_txschq_free_one(struct otx2_nic *pfvf, u16 lvl, u16 schq);
 void otx2_free_pending_sqe(struct otx2_nic *pfvf);
 void otx2_sqb_flush(struct otx2_nic *pfvf);
 int otx2_alloc_rbuf(struct otx2_nic *pfvf, struct otx2_pool *pool,
-		    dma_addr_t *dma);
+		    dma_addr_t *dma, int qidx, int idx);
 int otx2_rxtx_enable(struct otx2_nic *pfvf, bool enable);
 void otx2_ctx_disable(struct mbox *mbox, int type, bool npa);
 int otx2_nix_config_bp(struct otx2_nic *pfvf, bool enable);
@@ -1071,6 +1072,8 @@ int otx2_aura_aq_init(struct otx2_nic *pfvf, int aura_id,
 int otx2_pool_aq_init(struct otx2_nic *pfvf, u16 pool_id,
 		      int stack_pages, int numptrs, int buf_size, int type);
 int otx2_set_hw_capabilities(struct otx2_nic *pfvf);
+int otx2_rq_init(struct otx2_nic *pfvf, u16 qidx, u16 lpb_aura);
+int otx2_cq_init(struct otx2_nic *pfvf, u16 qidx);
 
 /* RSS configuration APIs*/
 int otx2_rss_init(struct otx2_nic *pfvf);
