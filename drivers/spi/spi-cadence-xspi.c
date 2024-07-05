@@ -279,8 +279,10 @@ struct dentry *mrvl_spi_debug_root;
 #define CHANGE_GPIO_SMC_ID 0xc2000b14
 #define SPI_GPIO(x) (x+GPIO_OFFSET)
 
-#define SPI0_BASE 0x8040
-#define SPI1_BASE 0x8050
+#define SPI0_SOC1_BASE 0x8040
+#define SPI1_SOC1_BASE 0x8050
+#define SPI0_SOC2_BASE 0xCF10
+#define SPI1_SOC2_BASE 0xCF11
 
 #define SPI_NOT_CLAIMED				0x00
 #define SPI_AP_NS_OWN				0x02
@@ -1106,7 +1108,7 @@ static int cdns_xspi_of_get_plat_data(struct platform_device *pdev)
 	if (device_property_read_u32(&pdev->dev, "reg", &base_addr))
 		dev_info(&pdev->dev, "Missing reg property");
 
-	if (base_addr == SPI0_BASE)
+	if (base_addr == SPI0_SOC1_BASE || base_addr == SPI0_SOC2_BASE)
 		cdns_xspi->xspi_id = 0;
 	else
 		cdns_xspi->xspi_id = 1;
