@@ -623,8 +623,8 @@ static int get_max_column_width(struct rvu *rvu)
 		return -ENOMEM;
 
 	for (pf = 0; pf < rvu->hw->total_pfs; pf++) {
-		for (vf = 0; vf <= rvu->hw->total_vfs; vf++) {
-			pcifunc = pf << 10 | vf;
+		for (vf = 0; vf <= rvu->hw->max_vfs_per_pf; vf++) {
+			pcifunc = pf << RVU_PFVF_PF_SHIFT | vf;
 			if (!pcifunc)
 				continue;
 
@@ -692,10 +692,10 @@ static ssize_t rvu_dbg_rsrc_attach_status(struct file *filp,
 	i++;
 	*ppos += off;
 	for (pf = 0; pf < rvu->hw->total_pfs; pf++) {
-		for (vf = 0; vf <= rvu->hw->total_vfs; vf++) {
+		for (vf = 0; vf <= rvu->hw->max_vfs_per_pf; vf++) {
 			off = 0;
 			flag = 0;
-			pcifunc = pf << 10 | vf;
+			pcifunc = pf << RVU_PFVF_PF_SHIFT | vf;
 			if (!pcifunc)
 				continue;
 
