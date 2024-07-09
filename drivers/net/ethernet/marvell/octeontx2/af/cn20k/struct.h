@@ -226,7 +226,7 @@ struct npa_cn20k_aura_s {
 	u64 limit                 : 36; /* W3 */
 	u64 reserved_228_231      : 4;
 	u64 bp                    : 7;
-	u64 reserved_239_243      : 3;
+	u64 reserved_239_243      : 5;
 	u64 fc_ena                : 1;
 	u64 fc_up_crossing        : 1;
 	u64 fc_stype              : 2;
@@ -250,7 +250,8 @@ struct npa_cn20k_aura_s {
 	u64 fc_msh_dst            : 11;
 	u64 reserved_435_438      : 4;
 	u64 op_dpc_ena            : 1;
-	u64 op_dpc_set            : 6;
+	u64 op_dpc_set            : 5;
+	u64 reserved_445_445      : 1;
 	u64 stream_ctx            : 1;
 	u64 unified_ctx           : 1;
 	u64 reserved_448_511;		/* W7 */
@@ -320,7 +321,8 @@ struct npa_cn20k_pool_s {
 	u64 fc_msh_dst		  : 11;
 	u64 reserved_627_630      : 4;
 	u64 op_dpc_ena            : 1;
-	u64 op_dpc_set            : 6;
+	u64 op_dpc_set            : 5;
+	u64 reserved_637_637      : 1;
 	u64 stream_ctx            : 1;
 	u64 reserved_639          : 1;
 	u64 reserved_640_703;		/* W10 */
