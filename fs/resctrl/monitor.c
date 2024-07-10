@@ -757,6 +757,9 @@ int resctrl_mon_resource_init(void)
 	enum resctrl_res_level i;
 	int ret;
 
+	if (!r->mon_capable)
+		return 0;
+
 	ret = dom_data_init(r);
 	if (ret)
 		return ret;
