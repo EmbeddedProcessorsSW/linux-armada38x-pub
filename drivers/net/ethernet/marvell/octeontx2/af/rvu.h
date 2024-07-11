@@ -318,6 +318,7 @@ struct rvu_pfvf {
 	struct  sdp_node_info *sdp_info;
 	u8	tl1_rr_prio; /* RR PRIORITY set by PF */
 	u8	esw_rules; /* Rules installed by ESW */
+	u8	hw_prio;   /* Hw priority of default rules */
 };
 
 enum rvu_pfvf_flags {
@@ -1141,7 +1142,6 @@ int rvu_nix_tl1_xoff_wait_for_link_credits(struct rvu *rvu, u16 pcifunc);
 int rvu_nix_tl1_xoff_clear(struct rvu *rvu, u16 pcifunc);
 int rvu_nix_aq_enq_inst(struct rvu *rvu, struct nix_aq_enq_req *req,
 			struct nix_aq_enq_rsp *rsp);
-
 
 /* NPC APIs */
 void rvu_npc_freemem(struct rvu *rvu);
