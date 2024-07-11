@@ -88,4 +88,42 @@
 #define NPC_AF_KPMX_PASS2_OFFSET(a)	(0x190000ull | (a) << 3)
 #define NPC_AF_MCAM_SECTIONX_CFG_EXT(a)	(0xC000000ull | (a) << 3)
 
+#define NPC_AF_CN20K_MCAMEX_BANKX_CAMX_INTF_EXT(a, b, c) ({		\
+	u64 offset;							\
+	offset = (0x8000000ull | (a) << 8 | (b) << 22 | (c) << 3);	\
+	offset; })
+
+#define NPC_AF_CN20K_MCAMEX_BANKX_CAMX_W0_EXT(a, b, c) ({		\
+	u64 offset;							\
+	offset = (0x8000010ull | (a) << 8 | (b) << 22 | (c) << 3);	\
+	offset; })
+
+#define NPC_AF_CN20K_MCAMEX_BANKX_CAMX_W1_EXT(a, b, c) ({		\
+	u64 offset;							\
+	offset = (0x8000020ull | (a) << 8 | (b) << 22 | (c) << 3);	\
+	offset; })
+
+#define NPC_AF_CN20K_MCAMEX_BANKX_CAMX_W2_EXT(a, b, c) ({		\
+	u64 offset;							\
+	offset = (0x8000030ull | (a) << 8 | (b) << 22 | (c) << 3);	\
+	offset; })
+
+#define NPC_AF_CN20K_MCAMEX_BANKX_CAMX_W3_EXT(a, b, c) ({		\
+	u64 offset;							\
+	offset = (0x8000040ull | (a) << 8 | (b) << 22 | (c) << 3);	\
+	offset; })
+
+#define NPC_AF_CN20K_MCAMEX_BANKX_CFG_EXT(a, b) ({		\
+	u64 offset;						\
+	offset = (0x8000050ull | (a) << 8 | (b) << 22);		\
+	offset; })
+
+#define NPC_AF_CN20K_MCAMEX_BANKX_ACTIONX_EXT(a, b, c) ({		   \
+	u64 offset;							   \
+									   \
+	offset = (0x8000060ull | (a) << 8 | (b) << 22 | (c) << 3);	   \
+	offset; })
+
+#define NPC_AF_INTFX_MISS_ACTX(a, b)	(0x1a00000 | (a) << 6 | (b) << 4)
+
 #endif /* RVU_MBOX_REG_H */
