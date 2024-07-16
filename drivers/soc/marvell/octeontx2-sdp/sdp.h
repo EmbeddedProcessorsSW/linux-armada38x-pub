@@ -14,12 +14,9 @@
 #include <linux/workqueue.h>
 #include <linux/pci.h>
 #include "mbox.h"
+#include "rvu.h"
 
 #define RVU_SDP_MAX_VFS		128
-#define RVU_PFVF_PF_SHIFT	10
-#define RVU_PFVF_PF_MASK	0x3F
-#define RVU_PFVF_FUNC_SHIFT	0
-#define RVU_PFVF_FUNC_MASK	0x3FF
 
 #define RVU_PFFUNC(pf, func)	\
 	((((pf) & RVU_PFVF_PF_MASK) << RVU_PFVF_PF_SHIFT) | \
