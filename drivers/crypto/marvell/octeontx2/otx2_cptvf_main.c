@@ -16,24 +16,34 @@ MODULE_PARM_DESC(cpt_block_num, "cpt block number (0=CPT0 1=CPT1, default 0)");
 
 static void cptvf_enable_pfvf_mbox_intrs(struct otx2_cptvf_dev *cptvf)
 {
+	u64 intr_bits = BIT_ULL(0);
+
+	if (is_cn20k(cptvf->pdev))
+		intr_bits |= BIT_ULL(1) | BIT_ULL(2) | BIT_ULL(3);
+
 	/* Clear interrupt if any */
 	otx2_cpt_write64(cptvf->reg_base, BLKADDR_RVUM, 0, OTX2_RVU_VF_INT,
-			 0x1ULL);
+			 intr_bits);
 
 	/* Enable PF-VF interrupt */
 	otx2_cpt_write64(cptvf->reg_base, BLKADDR_RVUM, 0,
-			 OTX2_RVU_VF_INT_ENA_W1S, 0x1ULL);
+			 OTX2_RVU_VF_INT_ENA_W1S, intr_bits);
 }
 
 static void cptvf_disable_pfvf_mbox_intrs(struct otx2_cptvf_dev *cptvf)
 {
+	u64 intr_bits = BIT_ULL(0);
+
+	if (is_cn20k(cptvf->pdev))
+		intr_bits |= BIT_ULL(1) | BIT_ULL(2) | BIT_ULL(3);
+
 	/* Disable PF-VF interrupt */
 	otx2_cpt_write64(cptvf->reg_base, BLKADDR_RVUM, 0,
-			 OTX2_RVU_VF_INT_ENA_W1C, 0x1ULL);
+			 OTX2_RVU_VF_INT_ENA_W1C, intr_bits);
 
 	/* Clear interrupt if any */
 	otx2_cpt_write64(cptvf->reg_base, BLKADDR_RVUM, 0, OTX2_RVU_VF_INT,
-			 0x1ULL);
+			 intr_bits);
 }
 
 static int cptvf_register_interrupts(struct otx2_cptvf_dev *cptvf)
@@ -56,8 +66,10 @@ static int cptvf_register_interrupts(struct otx2_cptvf_dev *cptvf)
 	irq = pci_irq_vector(cptvf->pdev, OTX2_CPT_VF_INT_VEC_E_MBOX);
 	/* Register VF<=>PF mailbox interrupt handler */
 	ret = devm_request_irq(&cptvf->pdev->dev, irq,
-			       otx2_cptvf_pfvf_mbox_intr, 0,
-			       "CPTPFVF Mbox", cptvf);
+			       is_cn20k(cptvf->pdev) ?
+			       cptvf_cn20k_pfvf_mbox_intr :
+			       otx2_cptvf_pfvf_mbox_intr,
+			       0, "CPTVF PFVF Mbox", cptvf);
 	if (ret)
 		return ret;
 	/* Enable PF-VF mailbox interrupts */
@@ -85,7 +97,12 @@ static int cptvf_pfvf_mbox_init(struct otx2_cptvf_dev *cptvf)
 	if (!cptvf->pfvf_mbox_wq)
 		return -ENOMEM;
 
-	if (test_bit(CN10K_MBOX, &cptvf->cap_flag)) {
+	if (is_cn20k(pdev)) {
+		cptvf->pfvf_mbox_base = cptvf->reg_base +
+					CPT_CN20K_VF_MBOX_BASE +
+					((u64)BLKADDR_MBOX <<
+					 OTX2_CPT_RVU_FUNC_BLKADDR_SHIFT);
+	} else if (test_bit(CN10K_MBOX, &cptvf->cap_flag)) {
 		/* For cn10k platform, VF mailbox region is in its BAR2
 		 * register space
 		 */

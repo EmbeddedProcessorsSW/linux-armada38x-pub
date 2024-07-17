@@ -26,6 +26,26 @@ int otx2_cptvf_mbox_bbuf_init(struct otx2_cptvf_dev *cptvf,
 	return 0;
 }
 
+irqreturn_t cptvf_cn20k_pfvf_mbox_intr(int __always_unused irq, void *arg)
+{
+	struct otx2_cptvf_dev *cptvf = arg;
+	u64 intr;
+
+	/* Read the interrupt bits */
+	intr = otx2_cpt_read64(cptvf->reg_base, BLKADDR_RVUM, 0,
+			       OTX2_RVU_VF_INT);
+
+	if (intr & BIT_ULL(1)) {
+		/* Schedule work queue function to process the MBOX request */
+		queue_work(cptvf->pfvf_mbox_wq, &cptvf->pfvf_mbox_work);
+		/* Clear and ack the interrupt */
+		otx2_cpt_write64(cptvf->reg_base, BLKADDR_RVUM, 0,
+				 OTX2_RVU_VF_INT, BIT_ULL(1));
+	}
+
+	return IRQ_HANDLED;
+}
+
 irqreturn_t otx2_cptvf_pfvf_mbox_intr(int __always_unused irq, void *arg)
 {
 	struct otx2_cptvf_dev *cptvf = arg;

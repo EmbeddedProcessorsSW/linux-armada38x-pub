@@ -357,6 +357,34 @@ inval_msg:
 	return err;
 }
 
+irqreturn_t cptpf_cn20k_vfpf_mbox_intr(int __always_unused irq, void *arg)
+{
+	struct cptpf_irq_data *irq_data = (struct cptpf_irq_data *)arg;
+	struct otx2_cptpf_dev *cptpf = irq_data->pf;
+	struct otx2_cptvf_info *vf;
+	int vf_idx;
+	u64 intr;
+
+	/* Sync with the mbox memory region */
+	rmb();
+
+	intr = otx2_cpt_read64(cptpf->reg_base, BLKADDR_RVUM, 0,
+			       irq_data->intr_status);
+
+	for (vf_idx = irq_data->start; vf_idx < cptpf->enabled_vfs; vf_idx++) {
+		vf = &cptpf->vf[vf_idx];
+		if (intr & (1ULL << vf->intr_idx)) {
+			queue_work(cptpf->vfpf_mbox_wq, &vf->vfpf_mbox_work);
+			/* Clear the interrupt */
+			otx2_cpt_write64(cptpf->reg_base, BLKADDR_RVUM,
+					 0, irq_data->intr_status,
+					 BIT_ULL(vf->intr_idx));
+		}
+	}
+
+	return IRQ_HANDLED;
+}
+
 irqreturn_t otx2_cptpf_vfpf_mbox_intr(int __always_unused irq, void *arg)
 {
 	struct otx2_cptpf_dev *cptpf = arg;

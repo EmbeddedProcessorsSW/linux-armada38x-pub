@@ -10,6 +10,8 @@
 #include "otx2_cptlf.h"
 
 #define CPT_CN20K_PFAF_MBOX_BASE	0x80000
+#define CPT_CN20K_PFVF_MBOX_IRQS	4
+#define CPT_CN20K_PFVF_MBOX_IRQ_NAME	32
 
 struct otx2_cptpf_dev;
 struct otx2_cptvf_info {
@@ -23,6 +25,15 @@ struct otx2_cptvf_info {
 struct cptpf_flr_work {
 	struct work_struct work;
 	struct otx2_cptpf_dev *pf;
+};
+
+struct cptpf_irq_data {
+	u64 intr_status;
+	struct otx2_cptpf_dev *pf;
+	char irq_name[CPT_CN20K_PFVF_MBOX_IRQ_NAME];
+	int vec_num;
+	int start;
+	int mdevs;
 };
 
 struct otx2_cptpf_dev {
@@ -50,6 +61,9 @@ struct otx2_cptpf_dev {
 	/* VF <=> PF mbox */
 	struct otx2_mbox	vfpf_mbox;
 	struct workqueue_struct *vfpf_mbox_wq;
+	/* CN20K PF<->VF mailbox IRQ vector data */
+	struct cptpf_irq_data	irq_data[CPT_CN20K_PFVF_MBOX_IRQS];
+	struct qmem		*mbox_qmem;
 
 	struct workqueue_struct	*flr_wq;
 	struct cptpf_flr_work   *flr_work;
@@ -75,6 +89,7 @@ irqreturn_t cptpf_cn20k_afpf_mbox_intr(int irq, void *arg);
 void otx2_cptpf_afpf_mbox_handler(struct work_struct *work);
 void otx2_cptpf_afpf_mbox_up_handler(struct work_struct *work);
 irqreturn_t otx2_cptpf_vfpf_mbox_intr(int irq, void *arg);
+irqreturn_t cptpf_cn20k_vfpf_mbox_intr(int irq, void *arg);
 void otx2_cptpf_vfpf_mbox_handler(struct work_struct *work);
 
 int otx2_inline_cptlf_setup(struct otx2_cptpf_dev *cptpf,
