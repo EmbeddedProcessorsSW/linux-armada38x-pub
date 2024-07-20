@@ -1850,6 +1850,8 @@ struct npc_mcam_alloc_entry_req {
 	u16 ref_entry;
 	u16 count;    /* Number of entries requested */
 	u8 kw_type; /* entry key type, valid for cn20k */
+	u8 virt;    /* Request virtual index */
+	u16 rsvd[16];	/* Reserved */
 };
 
 struct npc_mcam_alloc_entry_rsp {
@@ -1860,6 +1862,7 @@ struct npc_mcam_alloc_entry_rsp {
 	u16 count; /* Number of entries allocated */
 	u16 free_count; /* Number of entries available */
 	u16 entry_list[NPC_MAX_NONCONTIG_ENTRIES];
+	u16 rsvd[16];	/* Reserved */
 };
 
 struct npc_mcam_free_entry_req {
@@ -1949,7 +1952,8 @@ struct npc_mcam_alloc_and_write_entry_req {
 	u8  enable_entry;/* Enable this MCAM entry ? */
 	u8  alloc_cntr;  /* Allocate counter and map ? */
 	u8  hw_prio;	 /* hardware priority, valid for cn20k */
-	u64 reserved;	 /* reserved for future use */
+	u8  virt;	 /* Allcate virtual index */
+	u16 reserved[4]; /* reserved for future use */
 };
 
 struct npc_mcam_alloc_and_write_entry_rsp {
