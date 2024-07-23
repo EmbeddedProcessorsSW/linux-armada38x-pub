@@ -2105,6 +2105,7 @@ static int mpam_allocate_config(void)
 
 static void mpam_debugfs_setup(void)
 {
+	int idx;
 	char name[40];
 	char path[40];
 	struct mpam_msc *msc;
@@ -2114,7 +2115,9 @@ static void mpam_debugfs_setup(void)
 
 	lockdep_assert_held(&mpam_list_lock);
 
-	list_for_each_entry(msc, &mpam_all_msc, glbl_list) {
+	idx = srcu_read_lock(&mpam_srcu);
+	list_for_each_entry_srcu(msc, &mpam_all_msc, glbl_list,
+				 srcu_read_lock_held(&mpam_srcu)) {
 		debugfs_create_x32("iface", 0400, msc->debugfs, &msc->iface);
 		list_for_each_entry(ris, &msc->ris, msc_list) {
 			snprintf(name, sizeof(name), "ris.%u", ris->ris_idx);
@@ -2129,7 +2132,8 @@ static void mpam_debugfs_setup(void)
 		}
 	}
 
-	list_for_each_entry_rcu(class, &mpam_classes, classes_list) {
+	list_for_each_entry_srcu(class, &mpam_classes, classes_list,
+				 srcu_read_lock_held(&mpam_srcu)) {
 		snprintf(name, sizeof(name), "class.%u", class->level);
 		class->debugfs = debugfs_create_dir(name, mpam_debugfs);
 
@@ -2138,16 +2142,19 @@ static void mpam_debugfs_setup(void)
 		debugfs_create_x8("level", 0400, class->debugfs, &class->level);
 		debugfs_create_cpumask("affinity", 0400, class->debugfs, &class->affinity);
 
-		list_for_each_entry_rcu(comp, &class->components, class_list) {
+		list_for_each_entry_rcu(comp, &class->components, class_list,
+					srcu_read_lock_held(&mpam_srcu)) {
 			snprintf(name, sizeof(name), "comp.%u", comp->comp_id);
 			comp->debugfs = debugfs_create_dir(name, class->debugfs);
-			list_for_each_entry_rcu(ris, &comp->ris, comp_list) {
+			list_for_each_entry_rcu(ris, &comp->ris, comp_list,
+						srcu_read_lock_held(&mpam_srcu)) {
 				snprintf(name, sizeof(name), "msc.%u_ris.%u", ris->msc->id, ris->ris_idx);
 				snprintf(path, sizeof(path), "../../msc.%u/ris.%u", ris->msc->id, ris->ris_idx);
 				debugfs_create_symlink(name, comp->debugfs, path);
 			}
 		}
 	}
+	srcu_read_unlock(&mpam_srcu, idx);
 }
 
 static void mpam_enable_once(void)
