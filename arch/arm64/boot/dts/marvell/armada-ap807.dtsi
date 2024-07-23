@@ -26,6 +26,9 @@
 		clocks = <&ap_clk 0>, <&ap_clk 1>;
 		#clock-cells = <1>;
 	};
+	ap_thermal: thermal-sensor@80 {
+		compatible = "marvell,armada-ap807-thermal";
+	};
 };
 
 &ap_sdhci0 {

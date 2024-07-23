@@ -90,7 +90,7 @@ struct armada_thermal_data {
 	u32 coef_div;
 	bool inverted;
 	bool signed_sample;
-
+	bool multi_channel;
 	/* Register shift and mask to access the sensor temperature */
 	unsigned int temp_shift;
 	unsigned int temp_mask;
@@ -239,17 +239,37 @@ static void armada_ap806_init(struct platform_device *pdev,
 	struct armada_thermal_data *data = priv->data;
 	u32 reg;
 
+	/* Disable TSEN */
 	regmap_read(priv->syscon, data->syscon_control0_off, &reg);
+	reg &= ~(CONTROL0_TSEN_START | CONTROL0_TSEN_ENABLE);
+	regmap_write(priv->syscon, data->syscon_control0_off, reg);
+
+	/* Put TSEN in reset */
+	reg |= CONTROL0_TSEN_RESET;
+	regmap_write(priv->syscon, data->syscon_control0_off, reg);
+	udelay(5);
+
+	/* De-assert reset */
 	reg &= ~CONTROL0_TSEN_RESET;
-	reg |= CONTROL0_TSEN_START | CONTROL0_TSEN_ENABLE;
+	regmap_write(priv->syscon, data->syscon_control0_off, reg);
 
 	/* Sample every ~2ms */
 	reg |= CONTROL0_TSEN_OSR_MAX << CONTROL0_TSEN_OSR_SHIFT;
 
-	/* Enable average (2 samples by default) */
-	reg &= ~CONTROL0_TSEN_AVG_BYPASS;
-
+	/* Disable average (2 samples by default) */
+	reg |= CONTROL0_TSEN_AVG_BYPASS;
 	regmap_write(priv->syscon, data->syscon_control0_off, reg);
+
+	/* Enable TSEN */
+	reg |= CONTROL0_TSEN_START | CONTROL0_TSEN_ENABLE;
+	regmap_write(priv->syscon, data->syscon_control0_off, reg);
+}
+
+static void armada_ap807_init(struct platform_device *pdev,
+			      struct armada_thermal_priv *priv)
+{
+	/* The ap807 is initialized exactly like the ap806 for now. */
+	armada_ap806_init(pdev, priv);
 }
 
 static void armada_cp110_init(struct platform_device *pdev,
@@ -331,9 +351,18 @@ static int armada_select_channel(struct armada_thermal_priv *priv, int channel)
 	if (priv->current_channel == channel)
 		return 0;
 
-	/* Stop the measurements */
+	/* Disable TSEN */
 	regmap_read(priv->syscon, data->syscon_control0_off, &ctrl0);
-	ctrl0 &= ~CONTROL0_TSEN_START;
+	ctrl0 &= ~(CONTROL0_TSEN_START | CONTROL0_TSEN_ENABLE);
+	regmap_write(priv->syscon, data->syscon_control0_off, ctrl0);
+
+	/* Put TSEN in reset */
+	ctrl0 |= CONTROL0_TSEN_RESET;
+	regmap_write(priv->syscon, data->syscon_control0_off, ctrl0);
+	udelay(5);
+
+	/* De-assert reset */
+	ctrl0 &= ~CONTROL0_TSEN_RESET;
 	regmap_write(priv->syscon, data->syscon_control0_off, ctrl0);
 
 	/* Reset the mode, internal sensor will be automatically selected */
@@ -354,7 +383,7 @@ static int armada_select_channel(struct armada_thermal_priv *priv, int channel)
 	priv->current_channel = channel;
 
 	/* Re-start the measurements */
-	ctrl0 |= CONTROL0_TSEN_START;
+	ctrl0 |= CONTROL0_TSEN_START | CONTROL0_TSEN_ENABLE;
 	regmap_write(priv->syscon, data->syscon_control0_off, ctrl0);
 
 	/*
@@ -428,21 +457,24 @@ static int armada_get_temp(struct thermal_zone_device *tz, int *temp)
 
 	mutex_lock(&priv->update_lock);
 
-	/* Select the desired channel */
-	ret = armada_select_channel(priv, sensor->id);
-	if (ret)
-		goto unlock_mutex;
-
+	if (priv->data->multi_channel) {
+		/* Select the desired channel */
+		ret = armada_select_channel(priv, sensor->id);
+		if (ret)
+			goto unlock_mutex;
+	}
 	/* Do the actual reading */
 	ret = armada_read_sensor(priv, temp);
 	if (ret)
 		goto unlock_mutex;
 
-	/*
-	 * Select back the interrupt source channel from which a potential
-	 * critical trip point has been set.
-	 */
-	ret = armada_select_channel(priv, priv->interrupt_source);
+	if (priv->data->multi_channel) {
+		/*
+		 * Select back the interrupt source channel from which a potential
+		 * critical trip point has been set.
+		 */
+		ret = armada_select_channel(priv, priv->interrupt_source);
+	}
 
 unlock_mutex:
 	mutex_unlock(&priv->update_lock);
@@ -643,6 +675,32 @@ static const struct armada_thermal_data armada_ap806_data = {
 	.dfx_server_irq_mask_off = 0x104,
 	.dfx_server_irq_en = BIT(1),
 	.cpu_nr = 4,
+	.multi_channel = true,
+};
+
+static const struct armada_thermal_data armada_ap807_data = {
+	.init = armada_ap807_init,
+	.is_valid_bit = BIT(16),
+	.temp_shift = 0,
+	.temp_mask = 0x3ff,
+	.thresh_shift = 3,
+	.hyst_shift = 19,
+	.hyst_mask = 0x3,
+	.coef_b = -128900LL,
+	.coef_m = 394ULL,
+	.coef_div = 1,
+	.inverted = true,
+	.signed_sample = true,
+	.syscon_control0_off = 0x84,
+	.syscon_control1_off = 0x88,
+	.syscon_status_off = 0x8C,
+	.dfx_irq_cause_off = 0x108,
+	.dfx_irq_mask_off = 0x10C,
+	.dfx_overheat_irq = BIT(22),
+	.dfx_server_irq_mask_off = 0x104,
+	.dfx_server_irq_en = BIT(1),
+	.cpu_nr = 4,
+	.multi_channel = true,
 };
 
 static const struct armada_thermal_data armada_cp110_data = {
@@ -665,6 +723,7 @@ static const struct armada_thermal_data armada_cp110_data = {
 	.dfx_overheat_irq = BIT(20),
 	.dfx_server_irq_mask_off = 0x104,
 	.dfx_server_irq_en = BIT(1),
+	.multi_channel = false,
 };
 
 static const struct of_device_id armada_thermal_id_table[] = {
@@ -687,6 +746,10 @@ static const struct of_device_id armada_thermal_id_table[] = {
 	{
 		.compatible = "marvell,armada-ap806-thermal",
 		.data       = &armada_ap806_data,
+	},
+	{
+		.compatible = "marvell,armada-ap807-thermal",
+		.data       = &armada_ap807_data,
 	},
 	{
 		.compatible = "marvell,armada-cp110-thermal",
@@ -799,9 +862,11 @@ static int armada_configure_overheat_int(struct armada_thermal_priv *priv,
 	if (i == of_thermal_get_ntrips(tz))
 		return -EINVAL;
 
-	ret = armada_select_channel(priv, sensor_id);
-	if (ret)
-		return ret;
+	if (priv->data->multi_channel) {
+		ret = armada_select_channel(priv, sensor_id);
+		if (ret)
+			return ret;
+	}
 
 	armada_set_overheat_thresholds(priv,
 				       trips[i].temperature,
