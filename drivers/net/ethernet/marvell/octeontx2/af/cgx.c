@@ -2029,6 +2029,8 @@ static int cgx_lmac_init(struct cgx *cgx)
 		lmac->lmac_type = cgx->mac_ops->get_lmac_type(cgx, lmac->lmac_id);
 	}
 
+	/* Start X2P reset on given MAC block */
+	cgx->mac_ops->mac_x2p_reset(cgx, true);
 	return cgx_lmac_verify_fwi_version(cgx);
 
 err_bitmap_free:
@@ -2094,6 +2096,16 @@ static u8 cgx_get_rxid_mapoffset(struct cgx *cgx)
 		return 0x60;
 }
 
+/* TODO implement x2p reset */
+void cgx_x2p_reset(void *rpmd, bool enable)
+{
+}
+
+int cgx_enadis_rx(void *rpmd, int lmac_id, bool enable)
+{
+	return 0;
+}
+
 static struct mac_ops	cgx_mac_ops    = {
 	.name		=       "cgx",
 	.csr_offset	=       0,
@@ -2126,6 +2138,8 @@ static struct mac_ops	cgx_mac_ops    = {
 	.mac_reset                       =      cgx_lmac_reset,
 	.get_dmacflt_dropped_pktcnt      =      cgx_get_dmacflt_dropped_pktcnt,
 	.mac_stats_reset                 =	cgx_stats_reset,
+	.mac_x2p_reset                   =      cgx_x2p_reset,
+	.mac_enadis_rx			 =      cgx_enadis_rx,
 };
 
 static int cgx_probe(struct pci_dev *pdev, const struct pci_device_id *id)
