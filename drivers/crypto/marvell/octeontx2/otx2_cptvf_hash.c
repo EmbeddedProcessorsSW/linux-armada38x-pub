@@ -198,7 +198,8 @@ static inline void update_output_data(struct ahash_request *req, struct otx2_cpt
 static inline int cpt_hmac_enqueue(struct ahash_request *req, struct otx2_cpt_req_info *req_info,
 				   struct pci_dev *pdev, int cpu_num)
 {
-	req_info->ctrl.s.grp = otx2_cpt_get_kcrypto_eng_grp_num(pdev);
+	req_info->ctrl.s.grp = otx2_cpt_get_eng_grp_num(pdev,
+							OTX2_CPT_SE_TYPES);
 	req_info->callback = cpt_hash_callback;
 	req_info->areq = &req->base;
 	/*
