@@ -496,6 +496,16 @@ struct mbox_wq_info {
 	struct workqueue_struct *mbox_wq;
 };
 
+struct rvu_irq_data {
+	u64 intr_status;
+	void (*rvu_queue_work_hdlr)(struct mbox_wq_info *mw, int first,
+				    int mdevs, u64 intr);
+	struct	rvu *rvu;
+	int vec_num;
+	int start;
+	int mdevs;
+};
+
 struct mbox_ops {
 	irqreturn_t (*pf_intr_handler)(int irq, void *rvu_irq);
 };

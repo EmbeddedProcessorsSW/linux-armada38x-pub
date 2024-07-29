@@ -71,9 +71,79 @@ void otx2_mbox_destroy(struct otx2_mbox *mbox)
 }
 EXPORT_SYMBOL(otx2_mbox_destroy);
 
+int cn20k_mbox_setup(struct otx2_mbox *mbox, struct pci_dev *pdev,
+		     void *reg_base, int direction, int ndevs)
+{
+
+	switch (direction) {
+	case MBOX_DIR_AFPF:
+		mbox->tx_start = MBOX_DOWN_TX_START;
+		mbox->rx_start = MBOX_DOWN_RX_START;
+		mbox->tx_size  = MBOX_DOWN_TX_SIZE;
+		mbox->rx_size  = MBOX_DOWN_RX_SIZE;
+		break;
+	case MBOX_DIR_PFAF:
+		mbox->tx_start = MBOX_DOWN_RX_START;
+		mbox->rx_start = MBOX_DOWN_TX_START;
+		mbox->tx_size  = MBOX_DOWN_RX_SIZE;
+		mbox->rx_size  = MBOX_DOWN_TX_SIZE;
+		break;
+	case MBOX_DIR_AFPF_UP:
+		mbox->tx_start = MBOX_UP_TX_START;
+		mbox->rx_start = MBOX_UP_RX_START;
+		mbox->tx_size  = MBOX_UP_TX_SIZE;
+		mbox->rx_size  = MBOX_UP_RX_SIZE;
+		break;
+	case MBOX_DIR_PFAF_UP:
+		mbox->tx_start = MBOX_UP_RX_START;
+		mbox->rx_start = MBOX_UP_TX_START;
+		mbox->tx_size  = MBOX_UP_RX_SIZE;
+		mbox->rx_size  = MBOX_UP_TX_SIZE;
+		break;
+	default:
+		return -ENODEV;
+	}
+
+	switch (direction) {
+	case MBOX_DIR_AFPF:
+		mbox->trigger = RVU_MBOX_AF_AFPFX_TRIGX(1);
+		mbox->tr_shift = 4;
+		break;
+	case MBOX_DIR_AFPF_UP:
+		mbox->trigger = RVU_MBOX_AF_AFPFX_TRIGX(0);
+		mbox->tr_shift = 4;
+		break;
+	case MBOX_DIR_PFAF:
+		mbox->trigger = RVU_MBOX_PF_PFAF_TRIGX(0);
+		mbox->tr_shift = 0;
+		break;
+	case MBOX_DIR_PFAF_UP:
+		mbox->trigger = RVU_MBOX_PF_PFAF_TRIGX(1);
+		mbox->tr_shift = 0;
+		break;
+	default:
+		return -ENODEV;
+	}
+	mbox->reg_base = reg_base;
+	mbox->pdev = pdev;
+
+	mbox->dev = kcalloc(ndevs, sizeof(struct otx2_mbox_dev), GFP_KERNEL);
+	if (!mbox->dev) {
+		otx2_mbox_destroy(mbox);
+		return -ENOMEM;
+	}
+	mbox->ndevs = ndevs;
+
+	return 0;
+}
+
 static int otx2_mbox_setup(struct otx2_mbox *mbox, struct pci_dev *pdev,
 			   void *reg_base, int direction, int ndevs)
 {
+	if (is_cn20k(pdev))
+		return cn20k_mbox_setup(mbox, pdev, reg_base,
+							direction, ndevs);
+
 	switch (direction) {
 	case MBOX_DIR_AFPF:
 	case MBOX_DIR_PFVF:

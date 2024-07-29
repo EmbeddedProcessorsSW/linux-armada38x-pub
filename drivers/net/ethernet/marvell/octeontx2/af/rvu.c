@@ -2861,6 +2861,11 @@ static void rvu_enable_mbox_intr(struct rvu *rvu)
 {
 	struct rvu_hwinfo *hw = rvu->hw;
 
+	if (is_cn20k(rvu->pdev)) {
+		cn20k_rvu_enable_mbox_intr(rvu);
+		return;
+	}
+
 	/* Clear spurious irqs, if any */
 	rvu_write64(rvu, BLKADDR_RVUM,
 		    RVU_AF_PFAF_MBOX_INT, INTR_MASK(hw->total_pfs));
@@ -3344,9 +3349,12 @@ static void rvu_unregister_interrupts(struct rvu *rvu)
 	rvu_tim_unregister_interrupts(rvu);
 	rvu_cpt_unregister_interrupts(rvu);
 
-	/* Disable the Mbox interrupt */
-	rvu_write64(rvu, BLKADDR_RVUM, RVU_AF_PFAF_MBOX_INT_ENA_W1C,
-		    INTR_MASK(rvu->hw->total_pfs) & ~1ULL);
+	if (!is_cn20k(rvu->pdev))
+		/* Disable the Mbox interrupt */
+		rvu_write64(rvu, BLKADDR_RVUM, RVU_AF_PFAF_MBOX_INT_ENA_W1C,
+			    INTR_MASK(rvu->hw->total_pfs) & ~1ULL);
+	else
+		cn20k_rvu_unregister_interrupts(rvu);
 
 	/* Disable the PF FLR interrupt */
 	rvu_write64(rvu, BLKADDR_RVUM, RVU_AF_PFFLR_INT_ENA_W1C,
@@ -3409,20 +3417,30 @@ static int rvu_register_interrupts(struct rvu *rvu)
 		return ret;
 	}
 
-	/* Register mailbox interrupt handler */
-	sprintf(&rvu->irq_name[RVU_AF_INT_VEC_MBOX * NAME_SIZE], "RVUAF Mbox");
-	ret = request_irq(pci_irq_vector
-			  (rvu->pdev, RVU_AF_INT_VEC_MBOX),
-			  rvu->ng_rvu->rvu_mbox_ops->pf_intr_handler, 0,
-			  &rvu->irq_name[RVU_AF_INT_VEC_MBOX *
-			  NAME_SIZE], rvu);
-	if (ret) {
-		dev_err(rvu->dev,
-			"RVUAF: IRQ registration failed for mbox\n");
-		goto fail;
-	}
+	if (!is_cn20k(rvu->pdev)) {
+		/* Register mailbox interrupt handler */
+		sprintf(&rvu->irq_name[RVU_AF_INT_VEC_MBOX * NAME_SIZE],
+			"RVUAF Mbox");
+		ret = request_irq(pci_irq_vector
+				  (rvu->pdev, RVU_AF_INT_VEC_MBOX),
+				  rvu->ng_rvu->rvu_mbox_ops->pf_intr_handler, 0,
+				  &rvu->irq_name[RVU_AF_INT_VEC_MBOX *
+				  NAME_SIZE], rvu);
+		if (ret) {
+			dev_err(rvu->dev,
+				"RVUAF: IRQ registration failed for mbox\n");
+			goto fail;
+		}
 
-	rvu->irq_allocated[RVU_AF_INT_VEC_MBOX] = true;
+		rvu->irq_allocated[RVU_AF_INT_VEC_MBOX] = true;
+	} else {
+		ret = cn20k_register_afpf_mbox_intr(rvu);
+		if (ret) {
+			dev_err(rvu->dev,
+				"RVUAF: IRQ registration failed for mbox\n");
+			goto fail;
+		}
+	}
 
 	/* Enable mailbox interrupts from all PFs */
 	rvu_enable_mbox_intr(rvu);
@@ -3707,11 +3725,14 @@ static int rvu_enable_sriov(struct rvu *rvu)
 		return 0;
 	pci_read_config_word(pdev, pos + PCI_SRIOV_VF_DID, &rvu->vf_devid);
 
+	vfs = pci_sriov_get_totalvfs(pdev);
+	if (!vfs)
+		return 0;
+
 	chans = rvu_get_num_lbk_chans();
 	if (chans < 0)
 		return chans;
 
-	vfs = pci_sriov_get_totalvfs(pdev);
 
 	/* Limit VFs in case we have more VFs than LBK channels available. */
 	if (vfs > chans)
@@ -3938,6 +3959,8 @@ static void rvu_remove(struct pci_dev *pdev)
 	pci_set_drvdata(pdev, NULL);
 
 	devm_kfree(&pdev->dev, rvu->hw);
+	if (is_cn20k(rvu->pdev))
+		cn20k_free_mbox_memory(rvu);
 	kfree(rvu->ng_rvu);
 	devm_kfree(&pdev->dev, rvu);
 }

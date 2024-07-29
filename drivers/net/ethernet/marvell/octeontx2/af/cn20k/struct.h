@@ -333,4 +333,12 @@ struct npa_cn20k_pool_s {
 	u64 reserved_960_1023;		/* W15 */
 };
 
+/* CN20K MBOX AF interrupt vector enum */
+enum rvu_mbox_af_int_vec_e {
+	RVU_AF_INT_VEC_PFAF_MBOX0	= 0x6,
+	RVU_AF_INT_VEC_PFAF_MBOX1	= 0x7,
+	RVU_AF_INT_VEC_PFAF1_MBOX0	= 0x8,
+	RVU_AF_INT_VEC_PFAF1_MBOX1	= 0x9,
+};
+
 #endif
