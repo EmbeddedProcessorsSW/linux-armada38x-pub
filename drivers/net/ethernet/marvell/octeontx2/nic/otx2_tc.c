@@ -465,7 +465,7 @@ static int otx2_tc_parse_actions(struct otx2_nic *nic,
 		case FLOW_ACTION_REDIRECT_INGRESS:
 			target = act->dev;
 
-			if (!target->dev.parent) {
+			if (target->dev.parent) {
 				priv = netdev_priv(target);
 				/* npc_install_flow_req doesn't support passing a target pcifunc */
 				if (rvu_get_pf(nic->pcifunc) != rvu_get_pf(priv->pcifunc)) {

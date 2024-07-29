@@ -381,8 +381,8 @@ int rvu_rep_create(struct otx2_nic *priv, struct netlink_ext_ack *extack)
 		pcifunc = priv->rep_pf_map[rep_id];
 		rep->pcifunc = pcifunc;
 
-		snprintf(ndev->name, sizeof(ndev->name), "r%dp%d", rep_id,
-			 rvu_get_pf(pcifunc));
+		snprintf(ndev->name, sizeof(ndev->name), "r%dp%dv%d", rep_id,
+			 rvu_get_pf(pcifunc), (pcifunc & RVU_PFVF_FUNC_MASK));
 
 		eth_hw_addr_random(ndev);
 		err = register_netdev(ndev);
@@ -537,6 +537,11 @@ static int rvu_rep_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	err = otx2_init_rsrc(pdev, priv);
 	if (err)
 		goto err_release_regions;
+
+	priv->iommu_domain = iommu_get_domain_for_dev(dev);
+	if (priv->iommu_domain)
+		priv->iommu_domain_type =
+			((struct iommu_domain *)priv->iommu_domain)->type;
 
 	err = rvu_get_rep_cnt(priv);
 	if (err)
