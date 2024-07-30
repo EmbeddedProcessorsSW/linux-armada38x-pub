@@ -1729,6 +1729,11 @@ static int iommu_bus_notifier(struct notifier_block *nb,
 		ret = iommu_probe_device(dev);
 		return (ret) ? NOTIFY_DONE : NOTIFY_OK;
 	} else if (action == BUS_NOTIFY_REMOVED_DEVICE) {
+		const struct iommu_ops *ops = dev->bus->iommu_ops;
+
+		if (!ops)
+			return NOTIFY_DONE;
+
 		iommu_release_device(dev);
 		return NOTIFY_OK;
 	}
