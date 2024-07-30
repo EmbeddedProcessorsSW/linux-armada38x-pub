@@ -23,8 +23,6 @@
 #include "otx2_cptvf_algs.h"
 #include "otx2_cpt_reqmgr.h"
 
-#define CPT_EGRP_AE   2
-
 #define CPT_AE_EC_ID_P192  0
 #define CPT_AE_EC_ID_P224  1
 #define CPT_AE_EC_ID_P256  2
@@ -146,7 +144,8 @@ static inline int cpt_asym_enqueue(struct crypto_async_request *areq,
 	if (ret)
 		return ret;
 
-	req_info->ctrl.s.grp = CPT_EGRP_AE;
+	req_info->ctrl.s.grp = otx2_cpt_get_eng_grp_num(pdev,
+							OTX2_CPT_AE_TYPES);
 	req_info->areq = areq;
 	/*
 	 * We perform an asynchronous send and once
