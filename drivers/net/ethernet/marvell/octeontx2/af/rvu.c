@@ -25,6 +25,7 @@
 #include "cn20k/rvum.h"
 #include "cn20k/reg.h"
 #include "cn20k/api.h"
+#include "cn20k/rvum_reg.h"
 
 #define DRV_NAME	"rvu_af"
 #define DRV_STRING      "Marvell OcteonTX2 RVU Admin Function Driver"
