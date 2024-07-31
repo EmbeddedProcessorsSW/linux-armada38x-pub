@@ -2613,6 +2613,7 @@ error:
 
 static struct mbox_ops rvu_mbox_ops = {
 	.pf_intr_handler = rvu_mbox_pf_intr_handler,
+	.afvf_intr_handler = rvu_mbox_intr_handler,
 };
 
 static int rvu_mbox_init(struct rvu *rvu, struct mbox_wq_info *mw,
@@ -3387,6 +3388,10 @@ static int rvu_afvf_msix_vectors_num_ok(struct rvu *rvu)
 	 * VF interrupts can be handled. Offset equal to zero means
 	 * that PF vectors are not configured and overlapping AF vectors.
 	 */
+	if (is_cn20k(rvu->pdev))
+		return (pfvf->msix.max >= RVU_MBOX_AF_INT_VEC_CNT +
+			RVU_MBOX_PF_INT_VEC_CNT) && offset;
+
 	return (pfvf->msix.max >= RVU_AF_INT_VEC_CNT + RVU_PF_INT_VEC_CNT) &&
 	       offset;
 }
@@ -3495,34 +3500,40 @@ static int rvu_register_interrupts(struct rvu *rvu)
 	/* Get PF MSIX vectors offset. */
 	pf_vec_start = rvu_read64(rvu, BLKADDR_RVUM,
 				  RVU_PRIV_PFX_INT_CFG(0)) & 0x3ff;
+	if (!is_cn20k(rvu->pdev)) {
+		/* Register MBOX0 interrupt. */
+		offset = pf_vec_start + RVU_PF_INT_VEC_VFPF_MBOX0;
+		sprintf(&rvu->irq_name[offset * NAME_SIZE], "RVUAFVF Mbox0");
+		ret = request_irq(pci_irq_vector(rvu->pdev, offset),
+				  rvu->ng_rvu->rvu_mbox_ops->afvf_intr_handler, 0,
+				  &rvu->irq_name[offset * NAME_SIZE],
+				  rvu);
+		if (ret)
+			dev_err(rvu->dev,
+				"RVUAF: IRQ registration failed for Mbox0\n");
 
-	/* Register MBOX0 interrupt. */
-	offset = pf_vec_start + RVU_PF_INT_VEC_VFPF_MBOX0;
-	sprintf(&rvu->irq_name[offset * NAME_SIZE], "RVUAFVF Mbox0");
-	ret = request_irq(pci_irq_vector(rvu->pdev, offset),
-			  rvu_mbox_intr_handler, 0,
-			  &rvu->irq_name[offset * NAME_SIZE],
-			  rvu);
-	if (ret)
-		dev_err(rvu->dev,
-			"RVUAF: IRQ registration failed for Mbox0\n");
+		rvu->irq_allocated[offset] = true;
 
-	rvu->irq_allocated[offset] = true;
+		/* Register MBOX1 interrupt. MBOX1 IRQ number follows MBOX0 so
+		 * simply increment current offset by 1.
+		 */
+		offset = pf_vec_start + RVU_PF_INT_VEC_VFPF_MBOX1;
+		sprintf(&rvu->irq_name[offset * NAME_SIZE], "RVUAFVF Mbox1");
+		ret = request_irq(pci_irq_vector(rvu->pdev, offset),
+				  rvu->ng_rvu->rvu_mbox_ops->afvf_intr_handler, 0,
+				  &rvu->irq_name[offset * NAME_SIZE],
+				  rvu);
+		if (ret)
+			dev_err(rvu->dev,
+				"RVUAF: IRQ registration failed for Mbox1\n");
 
-	/* Register MBOX1 interrupt. MBOX1 IRQ number follows MBOX0 so
-	 * simply increment current offset by 1.
-	 */
-	offset = pf_vec_start + RVU_PF_INT_VEC_VFPF_MBOX1;
-	sprintf(&rvu->irq_name[offset * NAME_SIZE], "RVUAFVF Mbox1");
-	ret = request_irq(pci_irq_vector(rvu->pdev, offset),
-			  rvu_mbox_intr_handler, 0,
-			  &rvu->irq_name[offset * NAME_SIZE],
-			  rvu);
-	if (ret)
-		dev_err(rvu->dev,
-			"RVUAF: IRQ registration failed for Mbox1\n");
-
-	rvu->irq_allocated[offset] = true;
+		rvu->irq_allocated[offset] = true;
+	} else {
+		ret = cn20k_register_afvf_mbox_intr(rvu, pf_vec_start);
+		if (ret)
+			dev_err(rvu->dev,
+				"RVUAF: IRQ registration failed for Mbox\n");
+	}
 
 	/* Register FLR interrupt handler for AF's VFs */
 	offset = pf_vec_start + RVU_PF_INT_VEC_VFFLR0;
@@ -3642,6 +3653,9 @@ static void rvu_disable_afvf_intr(struct rvu *rvu)
 {
 	int vfs = rvu->vfs;
 
+	if (is_cn20k(rvu->pdev))
+		return cn20k_rvu_disable_afvf_intr(rvu, vfs);
+
 	rvupf_write64(rvu, RVU_PF_VFPF_MBOX_INT_ENA_W1CX(0), INTR_MASK(vfs));
 	rvupf_write64(rvu, RVU_PF_VFFLR_INT_ENA_W1CX(0), INTR_MASK(vfs));
 	rvupf_write64(rvu, RVU_PF_VFME_INT_ENA_W1CX(0), INTR_MASK(vfs));
@@ -3657,6 +3671,9 @@ static void rvu_disable_afvf_intr(struct rvu *rvu)
 static void rvu_enable_afvf_intr(struct rvu *rvu)
 {
 	int vfs = rvu->vfs;
+
+	if (is_cn20k(rvu->pdev))
+		return cn20k_rvu_enable_afvf_intr(rvu, vfs);
 
 	/* Clear any pending interrupts and enable AF VF interrupts for
 	 * the first 64 VFs.
@@ -3725,14 +3742,11 @@ static int rvu_enable_sriov(struct rvu *rvu)
 		return 0;
 	pci_read_config_word(pdev, pos + PCI_SRIOV_VF_DID, &rvu->vf_devid);
 
-	vfs = pci_sriov_get_totalvfs(pdev);
-	if (!vfs)
-		return 0;
-
 	chans = rvu_get_num_lbk_chans();
 	if (chans < 0)
 		return chans;
 
+	vfs = pci_sriov_get_totalvfs(pdev);
 
 	/* Limit VFs in case we have more VFs than LBK channels available. */
 	if (vfs > chans)

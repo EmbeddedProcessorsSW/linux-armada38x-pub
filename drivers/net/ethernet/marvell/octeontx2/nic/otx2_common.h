@@ -59,6 +59,7 @@
 
 irqreturn_t otx2_pfaf_mbox_intr_handler(int irq, void *pf_irq);
 irqreturn_t cn20k_pfaf_mbox_intr_handler(int irq, void *pf_irq);
+irqreturn_t cn20k_vfaf_mbox_intr_handler(int irq, void *vf_irq);
 
 enum arua_mapped_qtypes {
 	AURA_NIX_RQ,
@@ -238,6 +239,7 @@ struct otx2_hw {
 	u16			nix_msixoff; /* Offset of NIX vectors */
 	char			*irq_name;
 	cpumask_var_t           *affinity_mask;
+	struct pf_irq_data	*pfvf_irq_devid[4];
 
 	/* Stats */
 	struct otx2_dev_stats	dev_stats;
@@ -371,6 +373,7 @@ struct dev_hw_ops {
 				int stack_pages, int numptrs, int buf_size,
 				int type);
 	irqreturn_t (*pfaf_mbox_intr_handler)(int irq, void *pf_irq);
+	irqreturn_t (*vfaf_mbox_intr_handler)(int irq, void *pf_irq);
 };
 
 #define CN10K_MCS_SA_PER_SC	4
@@ -438,6 +441,16 @@ struct cn10k_mcs_cfg {
 	struct list_head rxsc_list;
 };
 
+struct pf_irq_data {
+	u64 intr_status;
+	void (*pf_queue_work_hdlr)(struct mbox *mb, struct workqueue_struct *mw,
+				   int first, int mdevs, u64 intr);
+	struct otx2_nic *pf;
+	int vec_num;
+	int start;
+	int mdevs;
+};
+
 struct otx2_nic {
 	void __iomem		*reg_base;
 	struct net_device	*netdev;
@@ -482,6 +495,7 @@ struct otx2_nic {
 	struct mbox		*mbox_pfvf;
 	struct workqueue_struct *mbox_wq;
 	struct workqueue_struct *mbox_pfvf_wq;
+	struct qmem		*pfvf_mbox_addr;
 
 	u8			total_vfs;
 	u16			pcifunc; /* RVU PF_FUNC */
