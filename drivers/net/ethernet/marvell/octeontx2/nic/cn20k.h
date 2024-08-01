@@ -11,4 +11,5 @@
 #include "otx2_common.h"
 
 int cn20k_init(struct otx2_nic *pfvf);
+int cn20k_check_pf_usable(struct otx2_nic *nic);
 #endif /* CN20K_H */

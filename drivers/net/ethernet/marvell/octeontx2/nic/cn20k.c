@@ -207,3 +207,20 @@ int cn20k_init(struct otx2_nic *pfvf)
 
 	return 0;
 }
+
+int cn20k_check_pf_usable(struct otx2_nic *nic)
+{
+	u64 cfg;
+
+	cfg = otx2_read64(nic, RVU_PF_DISC);
+	/* Check if AF has set the RVUM block addr bit,
+	 * otherwise this driver probe should be deferred
+	 * until AF driver comes up.
+	 */
+	if (!(cfg & BIT_ULL(BLKADDR_RVUM))) {
+		dev_warn(nic->dev,
+			 "AF is not initialized, deferring probe\n");
+		return -EPROBE_DEFER;
+	}
+	return 0;
+}

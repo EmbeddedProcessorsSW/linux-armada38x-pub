@@ -143,4 +143,7 @@
 #define LMT_LF_LMTLINEX(a)		(LMT_LFBASE | 0x000 | (a) << 12)
 #define LMT_LF_LMTCANCEL		(LMT_LFBASE | 0x400)
 
+/* CN20K registers */
+#define RVU_PF_DISC			(0x100)
+
 #endif /* OTX2_REG_H */
