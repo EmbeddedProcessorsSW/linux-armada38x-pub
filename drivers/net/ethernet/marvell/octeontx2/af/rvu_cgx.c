@@ -426,6 +426,8 @@ int rvu_cgx_init(struct rvu *rvu)
 	/* Clear X2P reset on all MAC blocks */
 	for (cgx = 0; cgx < rvu->cgx_cnt_max; cgx++) {
 		cgxd = rvu_cgx_pdata(cgx, rvu);
+		if (!cgxd)
+			continue;
 		mac_ops = get_mac_ops(cgxd);
 		mac_ops->mac_x2p_reset(cgxd, false);
 	}
