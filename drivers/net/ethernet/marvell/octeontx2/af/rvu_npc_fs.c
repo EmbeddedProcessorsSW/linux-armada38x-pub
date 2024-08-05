@@ -1335,11 +1335,11 @@ static int npc_update_tx_entry(struct rvu *rvu, struct rvu_pfvf *pfvf,
 	return 0;
 }
 
-static int npc_install_flow(struct rvu *rvu, int blkaddr, u16 target,
-			    int nixlf, struct rvu_pfvf *pfvf,
-			    struct npc_install_flow_req *req,
-			    struct npc_install_flow_rsp *rsp, bool enable,
-			    bool pf_set_vfs_mac)
+int npc_install_flow(struct rvu *rvu, int blkaddr, u16 target,
+		     int nixlf, struct rvu_pfvf *pfvf,
+		     struct npc_install_flow_req *req,
+		     struct npc_install_flow_rsp *rsp, bool enable,
+		     bool pf_set_vfs_mac)
 {
 	struct rvu_npc_mcam_rule *def_ucast_rule = pfvf->def_ucast_rule;
 	u64 features, installed_features, missing_features = 0;
@@ -1450,10 +1450,14 @@ find_rule:
 	rule->chan &= rule->chan_mask;
 	rule->lxmb = dummy.lxmb;
 	rule->hw_prio = req->hw_prio;
-	if (is_npc_intf_tx(req->intf))
-		rule->intf = pfvf->nix_tx_intf;
-	else
-		rule->intf = pfvf->nix_rx_intf;
+	if (is_pf_cgxmapped(rvu, req->hdr.pcifunc)) {
+		if (is_npc_intf_tx(req->intf))
+			rule->intf = pfvf->nix_tx_intf;
+		else
+			rule->intf = pfvf->nix_rx_intf;
+	} else {
+		rule->intf = req->intf;
+	}
 
 	if (new)
 		rvu_mcam_add_rule(mcam, rule);
