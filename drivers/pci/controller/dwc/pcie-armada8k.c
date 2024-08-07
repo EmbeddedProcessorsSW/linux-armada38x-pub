@@ -232,6 +232,7 @@ static void armada8k_pcie_recover_link(struct work_struct *ws)
 	struct dw_pcie_rp *pp = &pcie->pci->pp;
 	struct pci_bus *bus = pp->bridge->bus;
 	struct pci_dev *root_port;
+	struct pci_dev *child, *tmp;
 	int ret;
 
 	root_port = pci_get_slot(bus, 0);
@@ -240,7 +241,14 @@ static void armada8k_pcie_recover_link(struct work_struct *ws)
 		return;
 	}
 	pci_lock_rescan_remove();
-	pci_stop_and_remove_bus_device(root_port);
+
+	/* Remove all devices under root bus */
+	list_for_each_entry_safe(child, tmp,
+				 &root_port->subordinate->devices, bus_list) {
+		pci_stop_and_remove_bus_device(child);
+		dev_dbg(&child->dev, "removed\n");
+	}
+
 	/* Reset device if reset gpio is set */
 	if (pcie->reset_gpio) {
 		/* assert and then deassert the reset signal */
@@ -280,11 +288,12 @@ static void armada8k_pcie_recover_link(struct work_struct *ws)
 
 	/* Wait until the link becomes active again */
 	if (dw_pcie_wait_for_link(pcie->pci))
-		dev_err(pcie->pci->dev, "Link not up after reconfiguration\n");
+		goto fail;
 
-	bus = NULL;
-	while ((bus = pci_find_next_bus(bus)) != NULL)
-		pci_rescan_bus(bus);
+	dev_dbg(pcie->pci->dev, "%s: link has been recovered\n", __func__);
+
+	/* Rescan the root bus only if link is retained */
+	pci_rescan_bus(bus);
 
 fail:
 	pci_unlock_rescan_remove();
