@@ -1963,9 +1963,11 @@ bool is_higig2_enabled(void *cgxd, int lmac_id)
 
 static int cgx_lmac_init(struct cgx *cgx)
 {
+	u8 max_dmac_filters;
 	struct lmac *lmac;
 	u64 lmac_list = 0;
 	int i, err;
+	int filter;
 
 	/* lmac_list specifies which lmacs are enabled
 	 * when bit n is set to 1, LMAC[n] is enabled
@@ -2004,6 +2006,8 @@ static int cgx_lmac_init(struct cgx *cgx)
 				cgx->mac_ops->dmac_filter_count /
 				cgx->lmac_count;
 
+		max_dmac_filters = lmac->mac_to_index_bmap.max;
+
 		err = rvu_alloc_bitmap(&lmac->mac_to_index_bmap);
 		if (err)
 			goto err_name_free;
@@ -2033,6 +2037,15 @@ static int cgx_lmac_init(struct cgx *cgx)
 		set_bit(lmac->lmac_id, &cgx->lmac_bmap);
 		cgx->mac_ops->mac_pause_frm_config(cgx, lmac->lmac_id, true);
 		lmac->lmac_type = cgx->mac_ops->get_lmac_type(cgx, lmac->lmac_id);
+
+		/* Disable stale DMAC filters for sane state */
+		for (filter = 0; filter < max_dmac_filters; filter++)
+			cgx_lmac_addr_del(cgx->cgx_id, lmac->lmac_id, filter);
+
+		/* As cgx_lmac_addr_del does not clear entry for index 0
+		 * so it needs to be done explicitly
+		 */
+		cgx_lmac_addr_reset(cgx->cgx_id, lmac->lmac_id);
 	}
 
 	/* Start X2P reset on given MAC block */
