@@ -53,6 +53,9 @@
 #define RVU_PFVF_FUNC_MASK	rvu_pcifunc_func_mask
 
 #ifdef CONFIG_DEBUG_FS
+
+#define RVU_AFPF		25
+
 struct dump_ctx {
 	int	lf;
 	int	id;
@@ -1170,7 +1173,8 @@ int rvu_nix_tl1_xoff_wait_for_link_credits(struct rvu *rvu, u16 pcifunc);
 int rvu_nix_tl1_xoff_clear(struct rvu *rvu, u16 pcifunc);
 int rvu_nix_aq_enq_inst(struct rvu *rvu, struct nix_aq_enq_req *req,
 			struct nix_aq_enq_rsp *rsp);
-
+int rvu_alloc_cint_qint_mem(struct rvu *rvu, struct rvu_pfvf *pfvf,
+			    int blkaddr, int nixlf);
 /* NPC APIs */
 void rvu_npc_freemem(struct rvu *rvu);
 int rvu_npc_get_pkind(struct rvu *rvu, u16 pf);

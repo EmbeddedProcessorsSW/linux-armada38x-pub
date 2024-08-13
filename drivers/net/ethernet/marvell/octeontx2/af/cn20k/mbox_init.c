@@ -390,3 +390,35 @@ void cn20k_rvu_enable_afvf_intr(struct rvu *rvu, int vfs)
 	rvupf_write64(rvu, RVU_PF_VFFLR_INT_ENA_W1SX(1), INTR_MASK(vfs - 64));
 	rvupf_write64(rvu, RVU_PF_VFME_INT_ENA_W1SX(1), INTR_MASK(vfs - 64));
 }
+
+int rvu_alloc_cint_qint_mem(struct rvu *rvu, struct rvu_pfvf *pfvf,
+			    int blkaddr, int nixlf)
+{
+	int qints, hwctx_size, err;
+	u64 cfg, ctx_cfg;
+
+	ctx_cfg = rvu_read64(rvu, blkaddr, NIX_AF_CONST3);
+	/* Alloc memory for CQINT's HW contexts */
+	cfg = rvu_read64(rvu, blkaddr, NIX_AF_CONST2);
+	qints = (cfg >> 24) & 0xFFF;
+	hwctx_size = 1UL << ((ctx_cfg >> 24) & 0xF);
+	err = qmem_alloc(rvu->dev, &pfvf->cq_ints_ctx, qints, hwctx_size);
+	if (err)
+		return -ENOMEM;
+
+	rvu_write64(rvu, blkaddr, NIX_AF_LFX_CINTS_BASE(nixlf),
+		    (u64)pfvf->cq_ints_ctx->iova);
+
+	/* Alloc memory for QINT's HW contexts */
+	cfg = rvu_read64(rvu, blkaddr, NIX_AF_CONST2);
+	qints = (cfg >> 12) & 0xFFF;
+	hwctx_size = 1UL << ((ctx_cfg >> 20) & 0xF);
+	err = qmem_alloc(rvu->dev, &pfvf->nix_qints_ctx, qints, hwctx_size);
+	if (err)
+		return -ENOMEM;
+
+	rvu_write64(rvu, blkaddr, NIX_AF_LFX_QINTS_BASE(nixlf),
+		    (u64)pfvf->nix_qints_ctx->iova);
+
+	return 0;
+}

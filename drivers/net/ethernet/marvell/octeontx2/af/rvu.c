@@ -846,6 +846,11 @@ static void rvu_free_hw_resources(struct rvu *rvu)
 	rvu_reset_msix(rvu);
 	mutex_destroy(&rvu->rsrc_lock);
 	mutex_destroy(&rvu->alias_lock);
+
+	/* Free the QINT/CINt memory of alternative AF */
+	pfvf = &rvu->pf[RVU_AFPF];
+	qmem_free(rvu->dev, pfvf->nix_qints_ctx);
+	qmem_free(rvu->dev, pfvf->cq_ints_ctx);
 }
 
 static void rvu_setup_pfvf_macaddress(struct rvu *rvu)
@@ -2440,6 +2445,22 @@ static void __rvu_mbox_handler(struct rvu_work *mwork, int type, bool poll)
 
 	offset = mbox->rx_start + ALIGN(sizeof(*req_hdr), MBOX_MSG_ALIGN);
 
+	if (req_hdr->sig) {
+		req_hdr->opt_msg = mw->mbox_wrk[devid].num_msgs;
+		rvu_write64(rvu, BLKADDR_NIX0, RVU_AF_BAR2_SEL,
+			    RVU_AF_BAR2_PFID);
+		if (type == TYPE_AFPF)
+			rvu_write64(rvu, BLKADDR_NIX0,
+				    AF_BAR2_ALIASX(0, NIX_CINTX_INT_W1S(devid)),
+				    0x1);
+		else
+			rvu_write64(rvu, BLKADDR_NIX0,
+				    AF_BAR2_ALIASX(0, NIX_QINTX_CNT(devid)),
+				    0x1);
+		usleep_range(5000, 6000);
+		goto done;
+	}
+
 	for (id = 0; id < mw->mbox_wrk[devid].num_msgs; id++) {
 		msg = mdev->mbase + offset;
 
@@ -2473,6 +2494,7 @@ static void __rvu_mbox_handler(struct rvu_work *mwork, int type, bool poll)
 				 err, otx2_mbox_id2name(msg->id),
 				 msg->id, devid);
 	}
+done:
 	mw->mbox_wrk[devid].num_msgs = 0;
 
 	if (!is_cn20k(mbox->pdev) && poll)
@@ -2725,7 +2747,7 @@ static int rvu_mbox_init(struct rvu *rvu, struct mbox_wq_info *mw,
 	}
 
 	mw->mbox_wq = alloc_workqueue(name,
-				      WQ_UNBOUND | WQ_HIGHPRI | WQ_MEM_RECLAIM,
+				      WQ_HIGHPRI | WQ_MEM_RECLAIM,
 				      num);
 	if (!mw->mbox_wq) {
 		err = -ENOMEM;
@@ -3992,6 +4014,9 @@ static int rvu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	rvu_eblock_init();
 
+	/* Alloc CINT and QINT memory */
+	rvu_alloc_cint_qint_mem(rvu, &rvu->pf[RVU_AFPF], BLKADDR_NIX0,
+				(rvu->hw->block[BLKADDR_NIX0].lf.max));
 	return 0;
 err_dl:
 	rvu_eblock_exit();

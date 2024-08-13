@@ -46,8 +46,10 @@ void __otx2_mbox_reset(struct otx2_mbox *mbox, int devid)
 	mdev->rsp_size = 0;
 	tx_hdr->num_msgs = 0;
 	tx_hdr->msg_size = 0;
+	tx_hdr->sig = 0;
 	rx_hdr->num_msgs = 0;
 	rx_hdr->msg_size = 0;
+	rx_hdr->sig = 0;
 }
 EXPORT_SYMBOL(__otx2_mbox_reset);
 
@@ -349,8 +351,10 @@ static void otx2_mbox_msg_send_data(struct otx2_mbox *mbox, int devid, u64 data)
 
 	spin_lock(&mdev->mbox_lock);
 
-	tx_hdr->msg_size = mdev->msg_size;
-
+	if (!tx_hdr->sig) {
+		tx_hdr->msg_size = mdev->msg_size;
+		tx_hdr->num_msgs = mdev->num_msgs;
+	}
 	/* Reset header for next messages */
 	mdev->msg_size = 0;
 	mdev->rsp_size = 0;
@@ -363,7 +367,6 @@ static void otx2_mbox_msg_send_data(struct otx2_mbox *mbox, int devid, u64 data)
 	 * messages.  So this should be written after writing all the messages
 	 * to the shared memory.
 	 */
-	tx_hdr->num_msgs = mdev->num_msgs;
 	rx_hdr->num_msgs = 0;
 
 	msg = (struct mbox_msghdr *)(hw_mbase + mbox->tx_start + msgs_offset);
@@ -425,6 +428,7 @@ struct mbox_msghdr *otx2_mbox_alloc_msg_rsp(struct otx2_mbox *mbox, int devid,
 {
 	struct otx2_mbox_dev *mdev = &mbox->dev[devid];
 	struct mbox_msghdr *msghdr = NULL;
+	struct mbox_hdr *mboxhdr = NULL;
 
 	spin_lock(&mdev->mbox_lock);
 	size = ALIGN(size, MBOX_MSG_ALIGN);
@@ -448,6 +452,11 @@ struct mbox_msghdr *otx2_mbox_alloc_msg_rsp(struct otx2_mbox *mbox, int devid,
 	mdev->msg_size += size;
 	mdev->rsp_size += size_rsp;
 	msghdr->next_msgoff = mdev->msg_size + msgs_offset;
+
+	mboxhdr = mdev->mbase + mbox->tx_start;
+	/* Clear the msg header region */
+	memset(mboxhdr, 0, msgs_offset);
+
 exit:
 	spin_unlock(&mdev->mbox_lock);
 
