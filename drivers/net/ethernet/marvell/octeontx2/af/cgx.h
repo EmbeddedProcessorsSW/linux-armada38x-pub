@@ -201,4 +201,5 @@ int verify_lmac_fc_cfg(void *cgxd, int lmac_id, u8 tx_pause, u8 rx_pause,
 		       int pfvf_idx);
 int cgx_lmac_reset(void *cgxd, int lmac_id, u8 pf_req_flr);
 u64 cgx_get_dmacflt_dropped_pktcnt(void *cgx, int lmac_id);
+u32 cgx_get_fifo_len(void *cgxd);
 #endif /* CGX_H */
