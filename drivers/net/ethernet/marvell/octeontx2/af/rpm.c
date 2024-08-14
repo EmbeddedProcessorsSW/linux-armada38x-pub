@@ -719,6 +719,11 @@ int rpm_get_fec_stats(void *rpmd, int lmac_id, struct cgx_fec_stats_rsp *rsp)
 	if (rpm->lmac_idmap[lmac_id]->link_info.fec == OTX2_FEC_NONE)
 		return 0;
 
+	/* latched registers FCFECX_CW_HI/RSFEC_STAT_FAST_DATA_HI_CDC are common
+	 * for all counters. Acquire lock to ensure serialized reads
+	 */
+	mutex_lock(&rpm->lock);
+
 	if (rpm->lmac_idmap[lmac_id]->link_info.fec == OTX2_FEC_BASER) {
 		val_lo = rpm_read(rpm, lmac_id, RPMX_MTI_FCFECX_VL0_CCW_LO);
 		val_hi = rpm_read(rpm, lmac_id, RPMX_MTI_FCFECX_CW_HI);
@@ -751,15 +756,16 @@ int rpm_get_fec_stats(void *rpmd, int lmac_id, struct cgx_fec_stats_rsp *rsp)
 
 		val_lo = rpm_read(rpm, 0,
 				  RPMX_MTI_RSFEC_STAT_COUNTER_CAPTURE_2);
-		val_hi = rpm_read(rpm, 0, RPMX_MTI_STAT_DATA_HI_CDC);
+		val_hi = rpm_read(rpm, 0, RPMX_MTI_RSFEC_STAT_FAST_DATA_HI_CDC);
 		rsp->fec_corr_blks = (val_hi << 32 | val_lo);
 
 		val_lo = rpm_read(rpm, 0,
 				  RPMX_MTI_RSFEC_STAT_COUNTER_CAPTURE_3);
-		val_hi = rpm_read(rpm, 0, RPMX_MTI_STAT_DATA_HI_CDC);
+		val_hi = rpm_read(rpm, 0, RPMX_MTI_RSFEC_STAT_FAST_DATA_HI_CDC);
 		rsp->fec_uncorr_blks = (val_hi << 32 | val_lo);
 	}
 
+	mutex_unlock(&rpm->lock);
 	return 0;
 }
 
