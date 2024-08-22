@@ -215,6 +215,24 @@ u8 cgx_lmac_get_p2x(int cgx_id, int lmac_id)
 	return (cfg & CMR_P2X_SEL_MASK) >> CMR_P2X_SEL_SHIFT;
 }
 
+u8 cgx_get_nix_resetbit(struct cgx *cgx)
+{
+	int first_lmac;
+	u8 p2x;
+
+	/* non 98XX silicons supports only NIX0 block */
+	if (cgx->pdev->subsystem_device != PCI_SUBSYS_DEVID_98XX)
+		return CGX_NIX0_RESET;
+
+	first_lmac = find_first_bit(&cgx->lmac_bmap, cgx->max_lmac_per_mac);
+	p2x = cgx_lmac_get_p2x(cgx->cgx_id, first_lmac);
+
+	if (p2x == CMR_P2X_SEL_NIX1)
+		return CGX_NIX1_RESET;
+	else
+		return CGX_NIX0_RESET;
+}
+
 /* Ensure the required lock for event queue(where asynchronous events are
  * posted) is acquired before calling this API. Else an asynchronous event(with
  * latest link status) can reach the destination before this function returns
@@ -2115,13 +2133,42 @@ static u8 cgx_get_rxid_mapoffset(struct cgx *cgx)
 		return 0x60;
 }
 
-/* TODO implement x2p reset */
-void cgx_x2p_reset(void *rpmd, bool enable)
+void cgx_x2p_reset(void *cgxd, bool enable)
 {
+	struct cgx *cgx = cgxd;
+	int lmac_id;
+	u64 cfg;
+
+	if (enable) {
+		for_each_set_bit(lmac_id, &cgx->lmac_bmap, cgx->max_lmac_per_mac)
+			cgx->mac_ops->mac_enadis_rx(cgx, lmac_id, false);
+
+		usleep_range(1000, 2000);
+
+		cfg = cgx_read(cgx, 0, CGXX_CMR_GLOBAL_CONFIG);
+		cfg |= cgx_get_nix_resetbit(cgx) | CGX_NSCI_DROP;
+		cgx_write(cgx, 0, CGXX_CMR_GLOBAL_CONFIG, cfg);
+	} else {
+		cfg = cgx_read(cgx, 0, CGXX_CMR_GLOBAL_CONFIG);
+		cfg &= ~(cgx_get_nix_resetbit(cgx) | CGX_NSCI_DROP);
+		cgx_write(cgx, 0, CGXX_CMR_GLOBAL_CONFIG, cfg);
+	}
 }
 
-int cgx_enadis_rx(void *rpmd, int lmac_id, bool enable)
+int cgx_enadis_rx(void *cgxd, int lmac_id, bool enable)
 {
+	struct cgx *cgx = cgxd;
+	u64 cfg;
+
+	if (!is_lmac_valid(cgx, lmac_id))
+		return -ENODEV;
+
+	cfg = cgx_read(cgx, lmac_id, CGXX_CMRX_CFG);
+	if (enable)
+		cfg |= DATA_PKT_RX_EN;
+	else
+		cfg &= ~DATA_PKT_RX_EN;
+	cgx_write(cgx, lmac_id, CGXX_CMRX_CFG, cfg);
 	return 0;
 }
 
