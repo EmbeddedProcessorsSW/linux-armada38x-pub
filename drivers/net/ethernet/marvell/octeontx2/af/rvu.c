@@ -622,7 +622,7 @@ static void rvu_reset_all_blocks(struct rvu *rvu)
 	rvu_block_reset(rvu, BLKADDR_ML, ML_AF_BLK_RST);
 }
 
-static void rvu_reset_blk_lfcfg(struct rvu *rvu, struct rvu_block *block)
+void rvu_reset_blk_lfcfg(struct rvu *rvu, struct rvu_block *block)
 {
 	int lf;
 
@@ -632,7 +632,7 @@ static void rvu_reset_blk_lfcfg(struct rvu *rvu, struct rvu_block *block)
 			    0x0ULL);
 }
 
-static void rvu_scan_block(struct rvu *rvu, struct rvu_block *block)
+void rvu_scan_block(struct rvu *rvu, struct rvu_block *block)
 {
 	struct rvu_pfvf *pfvf;
 	u64 cfg;
