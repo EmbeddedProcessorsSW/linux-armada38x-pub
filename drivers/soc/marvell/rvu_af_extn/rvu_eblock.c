@@ -163,6 +163,7 @@ static inline bool is_eblock(int blkaddr)
 	/* List of extension blocks supported */
 	case BLKADDR_REE0:
 	case BLKADDR_REE1:
+	case BLKADDR_ML:
 		return true;
 	default:
 		return false;

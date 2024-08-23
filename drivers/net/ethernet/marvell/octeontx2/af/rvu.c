@@ -22,6 +22,7 @@
 #include "rvu_trace.h"
 #include "rvu_npc_hash.h"
 #include "rvu_eblock.h"
+#include "rvu_eblock_reg.h"
 #include "cn20k/rvum.h"
 #include "cn20k/reg.h"
 #include "cn20k/api.h"
@@ -618,6 +619,7 @@ static void rvu_reset_all_blocks(struct rvu *rvu)
 	rvu_block_reset(rvu, BLKADDR_NDC_NPA0, NDC_AF_BLK_RST);
 	rvu_block_reset(rvu, BLKADDR_REE0, REE_AF_BLK_RST);
 	rvu_block_reset(rvu, BLKADDR_REE1, REE_AF_BLK_RST);
+	rvu_block_reset(rvu, BLKADDR_ML, ML_AF_BLK_RST);
 }
 
 static void rvu_reset_blk_lfcfg(struct rvu *rvu, struct rvu_block *block)
