@@ -10,7 +10,8 @@
 
 int otx2_cpt_queue_get_default_pri(struct pci_dev *pdev)
 {
-	return OTX2_CPT_QUEUE_HI_PRI(CN10K_NUM_PRI_BITS);
+	return (is_cn20k(pdev)) ? OTX2_CPT_QUEUE_HI_PRI(CN20K_NUM_PRI_BITS)
+				: OTX2_CPT_QUEUE_HI_PRI(CN10K_NUM_PRI_BITS);
 }
 EXPORT_SYMBOL_NS_GPL(otx2_cpt_queue_get_default_pri, CRYPTO_DEV_OCTEONTX2_CPT);
 

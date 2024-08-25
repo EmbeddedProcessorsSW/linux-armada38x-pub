@@ -467,8 +467,8 @@ union otx2_cptx_lf_q_size {
 union otx2_cptx_af_lf_ctrl {
 	u64 u;
 	struct otx2_cptx_af_lf_ctrl_s {
-		u64 pri:1;
-		u64 reserved_1_8:8;
+		u64 pri:3;
+		u64 reserved_3_8:6;
 		u64 pf_func_inst:1;
 		u64 cont_err:1;
 		u64 reserved_11_15:5;

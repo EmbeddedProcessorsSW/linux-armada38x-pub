@@ -60,6 +60,7 @@
 
 /* Number of Queue priority bits implemented */
 #define CN10K_NUM_PRI_BITS 1
+#define CN20K_NUM_PRI_BITS 3
 
 enum otx2_cptlf_state {
 	OTX2_CPTLF_IN_RESET,
