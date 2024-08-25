@@ -226,7 +226,9 @@ otx2_inline_cptlf_setup(struct otx2_cptpf_dev *cptpf,
 {
 	int ret;
 
-	ret = otx2_cptlf_init(lfs, 1 << egrp, OTX2_CPT_QUEUE_HI_PRIO, 1);
+	ret = otx2_cptlf_init(lfs, 1 << egrp,
+			      otx2_cpt_queue_get_default_pri(cptpf->pdev),
+			      1);
 	if (ret) {
 		dev_err(&cptpf->pdev->dev,
 			"LF configuration failed for RX inline ipsec.\n");

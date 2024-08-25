@@ -44,6 +44,8 @@
 #define OTX2_CPT_INST_GRP_QLEN_BYTES                                           \
 		((OTX2_CPT_SIZE_DIV40 + OTX2_CPT_EXTRA_SIZE_DIV40) * 16)
 
+#define OTX2_CPT_QUEUE_HI_PRI(num_bits) ((1U << (num_bits)) - 1)
+
 /* CPT FC length in bytes */
 #define OTX2_CPT_Q_FC_LEN 128
 
@@ -56,9 +58,8 @@
 /* Maximum LFs supported in OcteonTX2 for CPT */
 #define OTX2_CPT_MAX_LFS_NUM    64
 
-/* Queue priority */
-#define OTX2_CPT_QUEUE_HI_PRIO  0x1
-#define OTX2_CPT_QUEUE_LOW_PRIO 0x0
+/* Number of Queue priority bits implemented */
+#define CN10K_NUM_PRI_BITS 1
 
 enum otx2_cptlf_state {
 	OTX2_CPTLF_IN_RESET,
@@ -441,5 +442,6 @@ void otx2_cptlf_unregister_misc_interrupts(struct otx2_cptlfs_info *lfs);
 void otx2_cptlf_unregister_done_interrupts(struct otx2_cptlfs_info *lfs);
 void otx2_cptlf_free_irqs_affinity(struct otx2_cptlfs_info *lfs);
 int otx2_cptlf_set_irqs_affinity(struct otx2_cptlfs_info *lfs);
+int otx2_cpt_queue_get_default_pri(struct pci_dev *pdev);
 
 #endif /* __OTX2_CPTLF_H */

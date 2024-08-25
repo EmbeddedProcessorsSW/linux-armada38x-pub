@@ -316,7 +316,8 @@ static int cptvf_lf_init(struct otx2_cptvf_dev *cptvf)
 
 	lfs_num = cptvf->lfs.kvf_limits;
 
-	ret = otx2_cptlf_init(lfs, 0xF, OTX2_CPT_QUEUE_HI_PRIO,
+	ret = otx2_cptlf_init(lfs, 0xF,
+			      otx2_cpt_queue_get_default_pri(cptvf->pdev),
 			      lfs_num);
 	if (ret)
 		return ret;

@@ -1571,7 +1571,8 @@ int otx2_cpt_discover_eng_capabilities(struct otx2_cptpf_dev *cptpf)
 		goto delete_grps;
 
 	ret = otx2_cptlf_init(lfs, OTX2_CPT_ALL_ENG_GRPS_MASK,
-			      OTX2_CPT_QUEUE_HI_PRIO, 1);
+			      otx2_cpt_queue_get_default_pri(cptpf->pdev),
+			      1);
 	if (ret)
 		goto delete_grps;
 

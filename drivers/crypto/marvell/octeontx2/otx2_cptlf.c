@@ -8,6 +8,12 @@
 #define CPT_TIMER_HOLD 0x03F
 #define CPT_COUNT_HOLD 32
 
+int otx2_cpt_queue_get_default_pri(struct pci_dev *pdev)
+{
+	return OTX2_CPT_QUEUE_HI_PRI(CN10K_NUM_PRI_BITS);
+}
+EXPORT_SYMBOL_NS_GPL(otx2_cpt_queue_get_default_pri, CRYPTO_DEV_OCTEONTX2_CPT);
+
 static void cptlf_do_set_done_time_wait(struct otx2_cptlf_info *lf,
 					int time_wait)
 {
