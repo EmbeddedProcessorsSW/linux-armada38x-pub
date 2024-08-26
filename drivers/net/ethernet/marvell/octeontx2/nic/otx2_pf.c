@@ -1632,6 +1632,7 @@ static void otx2_free_sq_res(struct otx2_nic *pf)
 			continue;
 		qmem_free(pf->dev, sq->sqe);
 		qmem_free(pf->dev, sq->tso_hdrs);
+		qmem_free(pf->dev, sq->timestamps);
 		kfree(sq->sg);
 		kfree(sq->sqb_ptrs);
 	}
@@ -2321,7 +2322,6 @@ int otx2_stop(struct net_device *netdev)
 
 	for (qidx = 0; qidx < netdev->num_tx_queues; qidx++)
 		netdev_tx_reset_queue(netdev_get_tx_queue(netdev, qidx));
-
 
 	otx2_free_queue_mem(qset);
 
