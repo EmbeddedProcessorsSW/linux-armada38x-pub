@@ -141,6 +141,7 @@ static void process_pfvf_mbox_mbox_msg(struct otx2_cptvf_dev *cptvf,
 		break;
 	case MBOX_MSG_CPT_LF_RESET:
 	case MBOX_MSG_LMTST_TBL_SETUP:
+	case MBOX_MSG_CPT_SET_QUEQE_PRI:
 		break;
 	default:
 		dev_err(&cptvf->pdev->dev, "Unsupported msg %d received.\n",

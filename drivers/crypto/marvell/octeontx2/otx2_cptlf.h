@@ -58,10 +58,6 @@
 /* Maximum LFs supported in OcteonTX2 for CPT */
 #define OTX2_CPT_MAX_LFS_NUM    64
 
-/* Number of Queue priority bits implemented */
-#define CN10K_NUM_PRI_BITS 1
-#define CN20K_NUM_PRI_BITS 3
-
 enum otx2_cptlf_state {
 	OTX2_CPTLF_IN_RESET,
 	OTX2_CPTLF_STARTED,
@@ -434,7 +430,7 @@ static inline void otx2_cptlf_set_dev_info(struct otx2_cptlfs_info *lfs,
 	lfs->blkaddr = blkaddr;
 }
 
-int otx2_cptlf_init(struct otx2_cptlfs_info *lfs, u8 eng_grp_msk, int pri,
+int otx2_cptlf_init(struct otx2_cptlfs_info *lfs, u8 eng_grp_msk, u8 pri,
 		    int lfs_num);
 void otx2_cptlf_shutdown(struct otx2_cptlfs_info *lfs);
 int otx2_cptlf_register_misc_interrupts(struct otx2_cptlfs_info *lfs);
@@ -443,6 +439,6 @@ void otx2_cptlf_unregister_misc_interrupts(struct otx2_cptlfs_info *lfs);
 void otx2_cptlf_unregister_done_interrupts(struct otx2_cptlfs_info *lfs);
 void otx2_cptlf_free_irqs_affinity(struct otx2_cptlfs_info *lfs);
 int otx2_cptlf_set_irqs_affinity(struct otx2_cptlfs_info *lfs);
-int otx2_cpt_queue_get_default_pri(struct pci_dev *pdev);
+int otx2_cptlf_set_que_pri_msg(struct otx2_cptlfs_info *lfs, u8 pri);
 
 #endif /* __OTX2_CPTLF_H */
