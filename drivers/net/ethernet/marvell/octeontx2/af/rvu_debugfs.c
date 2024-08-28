@@ -982,8 +982,10 @@ static void print_npa_aura_ctx(struct seq_file *m, struct npa_aq_enq_rsp *rsp)
 	struct npa_aura_s *aura = &rsp->aura;
 	struct rvu *rvu = m->private;
 
-	if (is_cn20k(rvu->pdev))
+	if (is_cn20k(rvu->pdev)) {
 		print_npa_cn20k_aura_ctx(m, (struct npa_cn20k_aq_enq_rsp *)rsp);
+		return;
+	}
 
 	seq_printf(m, "W0: Pool addr\t\t%llx\n", aura->pool_addr);
 
@@ -1033,8 +1035,10 @@ static void print_npa_pool_ctx(struct seq_file *m, struct npa_aq_enq_rsp *rsp)
 	struct npa_pool_s *pool = &rsp->pool;
 	struct rvu *rvu = m->private;
 
-	if (is_cn20k(rvu->pdev))
+	if (is_cn20k(rvu->pdev)) {
 		print_npa_cn20k_pool_ctx(m, (struct npa_cn20k_aq_enq_rsp *)rsp);
+		return;
+	}
 
 	seq_printf(m, "W0: Stack base\t\t%llx\n", pool->stack_base);
 
