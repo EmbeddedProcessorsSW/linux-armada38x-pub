@@ -335,6 +335,9 @@ struct npa_cn20k_pool_s {
 
 /**
  * CN20k RVU PF MBOX Interrupt Vector Enumeration
+ *
+ * Vectors 0 - 3 are compatible with pre cn20k and hence
+ * existing macros are being reused.
  */
 enum rvu_mbox_pf_int_vec_e {
 	RVU_MBOX_PF_INT_VEC_VFPF_MBOX0	= 0x4,
