@@ -179,28 +179,29 @@ int cn20k_register_afpf_mbox_intr(struct rvu *rvu)
 	if (!irq_data)
 		return -ENOMEM;
 
-	for (intr_vec = RVU_AF_INT_VEC_PFAF_MBOX0; intr_vec <=
-				RVU_AF_INT_VEC_PFAF1_MBOX1; intr_vec++, vec++) {
+	for (intr_vec = RVU_AF_CN20K_INT_VEC_PFAF_MBOX0; intr_vec <=
+				RVU_AF_CN20K_INT_VEC_PFAF1_MBOX1; intr_vec++,
+				vec++) {
 		switch (intr_vec) {
-		case RVU_AF_INT_VEC_PFAF_MBOX0:
+		case RVU_AF_CN20K_INT_VEC_PFAF_MBOX0:
 			irq_data[vec].intr_status =
 						RVU_MBOX_AF_PFAF_INT(0);
 			irq_data[vec].start = 0;
 			irq_data[vec].mdevs = 64;
 			break;
-		case RVU_AF_INT_VEC_PFAF_MBOX1:
+		case RVU_AF_CN20K_INT_VEC_PFAF_MBOX1:
 			irq_data[vec].intr_status =
 						RVU_MBOX_AF_PFAF_INT(1);
 			irq_data[vec].start = 64;
 			irq_data[vec].mdevs = 96;
 			break;
-		case RVU_AF_INT_VEC_PFAF1_MBOX0:
+		case RVU_AF_CN20K_INT_VEC_PFAF1_MBOX0:
 			irq_data[vec].intr_status =
 						RVU_MBOX_AF_PFAF1_INT(0);
 			irq_data[vec].start = 0;
 			irq_data[vec].mdevs = 64;
 			break;
-		case RVU_AF_INT_VEC_PFAF1_MBOX1:
+		case RVU_AF_CN20K_INT_VEC_PFAF1_MBOX1:
 			irq_data[vec].intr_status =
 						RVU_MBOX_AF_PFAF1_INT(1);
 			irq_data[vec].start = 64;
