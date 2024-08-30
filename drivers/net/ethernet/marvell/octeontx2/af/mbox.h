@@ -760,6 +760,7 @@ struct cgx_lmac_fwdata_s {
 	u32 lmac_type;
 	u32 portm_idx;
 	u64 mgmt_port:1;
+	u64 advertised_an:1;
 #define LMAC_FWDATA_RESERVED_MEM 1019
 	u64 reserved[LMAC_FWDATA_RESERVED_MEM];
 };
