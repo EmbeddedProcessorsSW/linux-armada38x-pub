@@ -65,6 +65,15 @@ static size_t cnf10k_cpri_debugfs_get_buffer_size(void);
 static void cnf10k_cpri_debugfs_create(struct cnf10k_cpri_drv_ctx *ctx);
 static void cnf10k_cpri_debugfs_remove(struct cnf10k_cpri_drv_ctx *ctx);
 
+/* UL freeze monitoring */
+#define UL_FREEZE_MONITOR_MS	500
+static struct timer_list cpri_ul_check_timer;
+static void cnf10k_cpri_ul_check_cb(struct timer_list *t);
+static void cnf10k_cpri_ul_check_freeze(int cpri,
+					struct cnf10k_ul_cbuf_cfg *ul_cfg);
+static u64 cnf10k_cpri_ul_get_fifo_ovr_cnt(int cpri_num);
+static void cnf10k_cpri_ul_get_hw_rd_wr_ptrs(int cpri_num, u16 *rd, u16 *wr);
+
 static struct net_device *cnf10k_cpri_get_netdev(int mhab_id, int lmac_id)
 {
 	struct net_device *netdev = NULL;
@@ -129,6 +138,9 @@ void cnf10k_bphy_cpri_cleanup(void)
 	struct net_device *netdev;
 	int i;
 
+	/* delete the ul check timer */
+	del_timer_sync(&cpri_ul_check_timer);
+
 	for (i = 0; i < CNF10K_BPHY_CPRI_MAX_INTF; i++) {
 		drv_ctx = &cnf10k_cpri_drv_ctx[i];
 		if (drv_ctx->valid) {
@@ -166,6 +178,8 @@ static int cnf10k_cpri_process_rx_pkts(struct cnf10k_cpri_ndev_priv *priv,
 
 	ul_cfg = &priv->cpri_common->ul_cfg;
 
+	spin_lock(&ul_cfg->lock);
+
 	nxt_wr_ptr = readq(priv->cpri_reg_base +
 			   CNF10K_CPRIX_RXD_GMII_UL_NXT_WR_PTR(priv->cpri_num)) &
 			0xFFFF;
@@ -177,6 +191,11 @@ static int cnf10k_cpri_process_rx_pkts(struct cnf10k_cpri_ndev_priv *priv,
 		count += head;
 	} else {
 		count = head - ul_cfg->sw_rd_ptr;
+	}
+
+	if (!count && ul_cfg->flush) {
+		count = ul_cfg->num_entries;
+		ul_cfg->flush = false;
 	}
 
 	while (likely((processed_pkts < budget) && (processed_pkts < count))) {
@@ -248,6 +267,8 @@ update_processed_pkts:
 	if (processed_pkts)
 		writeq(processed_pkts, priv->cpri_reg_base +
 		       CNF10K_CPRIX_RXD_GMII_UL_RD_DOORBELL(priv->cpri_num));
+
+	spin_unlock(&ul_cfg->lock);
 
 	return processed_pkts;
 }
@@ -666,6 +687,11 @@ int cnf10k_cpri_parse_and_init_intf(struct otx2_bphy_cdev_priv *cdev,
 		}
 	}
 
+	/* setup the ul freeze monitoring timer and schedule it */
+	timer_setup(&cpri_ul_check_timer, cnf10k_cpri_ul_check_cb, 0);
+	mod_timer(&cpri_ul_check_timer,
+		  jiffies + msecs_to_jiffies(UL_FREEZE_MONITOR_MS));
+
 	return 0;
 
 err_exit:
@@ -707,7 +733,8 @@ static void cnf10k_cpri_debugfs_reader(char *buffer, size_t count, void *priv)
 		 netdev->last_tx_dropped_jiffies,
 		 netdev->last_rx_jiffies,
 		 netdev->last_rx_dropped_jiffies,
-		 jiffies);
+		 jiffies,
+		 netdev->cpri_common->ul_cfg.ul_recovery_cnt);
 }
 
 static const char *cnf10k_cpri_debugfs_get_formatter(void)
@@ -718,7 +745,8 @@ static const char *cnf10k_cpri_debugfs_get_formatter(void)
 					   "last-tx-dropped-jiffies: %lu\n"
 					   "last-rx-jiffies: %lu\n"
 					   "last-rx-dropped-jiffies: %lu\n"
-					   "current-jiffies: %lu\n";
+					   "current-jiffies: %lu\n"
+					   "ul-recovery-cnt: %lu\n";
 
 	return buffer_format;
 }
@@ -735,6 +763,7 @@ static size_t cnf10k_cpri_debugfs_get_buffer_size(void)
 		buffer_size = snprintf(NULL, 0, formatter,
 				       max_boolean,
 				       max_boolean,
+				       max_jiffies,
 				       max_jiffies,
 				       max_jiffies,
 				       max_jiffies,
@@ -785,4 +814,90 @@ void cnf10k_cpri_set_link_state(struct net_device *netdev, u8 state)
 		}
 	}
 	spin_unlock(&priv->lock);
+}
+
+static void cnf10k_cpri_ul_check_cb(struct timer_list *t)
+{
+	struct cnf10k_cpri_ndev_priv *priv = NULL;
+	struct net_device *netdev = NULL;
+	int current_cpri_num = -1;
+	int handled_cpri_num = -1;
+	int idx;
+
+	for (idx = 0; idx < CNF10K_BPHY_CPRI_MAX_INTF; idx++) {
+		current_cpri_num = cnf10k_cpri_drv_ctx[idx].cpri_num;
+		if (cnf10k_cpri_drv_ctx[idx].valid &&
+		    current_cpri_num != handled_cpri_num) {
+			netdev = cnf10k_cpri_drv_ctx[idx].netdev;
+			priv = netdev_priv(netdev);
+			if (netif_running(netdev) &&
+			    priv->link_state == LINK_STATE_UP) {
+				cnf10k_cpri_ul_check_freeze(current_cpri_num,
+							    &priv->cpri_common->ul_cfg);
+				handled_cpri_num = cnf10k_cpri_drv_ctx[idx].cpri_num;
+			}
+		}
+	}
+	mod_timer(&cpri_ul_check_timer,
+		  jiffies + msecs_to_jiffies(UL_FREEZE_MONITOR_MS));
+}
+
+static void cnf10k_cpri_ul_get_hw_rd_wr_ptrs(int cpri_num, u16 *rd, u16 *wr)
+{
+	u16 nxt_wr_ptr, rd_ptr;
+
+	nxt_wr_ptr = readq(cpri_reg_base +
+			   CNF10K_CPRIX_RXD_GMII_UL_NXT_WR_PTR(cpri_num)) & 0xFFFF;
+
+	rd_ptr = readq(cpri_reg_base +
+		       CNF10K_CPRIX_RXD_GMII_UL_SW_RD_PTR(cpri_num)) & 0xFFFF;
+
+	*rd = CNF10K_CIRC_BUF_ENTRY(rd_ptr);
+	*wr = CNF10K_CIRC_BUF_ENTRY(nxt_wr_ptr);
+}
+
+static void cnf10k_cpri_ul_check_freeze(int cpri,
+					struct cnf10k_ul_cbuf_cfg *ul_cfg)
+{
+	u16 rd_ptr = 0, wr_ptr = 0;
+	u64 ul_fifo_ovr_cnt;
+
+	ul_fifo_ovr_cnt = cnf10k_cpri_ul_get_fifo_ovr_cnt(cpri);
+	/* check change in packets counters */
+	if (ul_cfg->ul_fifo_ovr_cnt < ul_fifo_ovr_cnt) {
+		/* check if hw pointers are equal */
+		cnf10k_cpri_ul_get_hw_rd_wr_ptrs(cpri, &rd_ptr, &wr_ptr);
+		if (rd_ptr == wr_ptr) {
+			pr_info("CPRI %d UL fifo ovr changed (%llu -> %llu) rd-ptr/wr-ptr = %u\n",
+				cpri, ul_cfg->ul_fifo_ovr_cnt, ul_fifo_ovr_cnt, rd_ptr);
+			/* schedule a napi poll */
+			spin_lock(&ul_cfg->lock);
+			++ul_cfg->ul_recovery_cnt;
+			ul_cfg->flush = true;
+			cnf10k_cpri_rx_napi_schedule(cpri, 0);
+			spin_unlock(&ul_cfg->lock);
+		}
+	}
+
+	ul_cfg->ul_fifo_ovr_cnt = ul_fifo_ovr_cnt;
+}
+
+static u64 cnf10k_cpri_ul_get_fifo_ovr_cnt(int cpri_num)
+{
+	struct cnf10k_cpri_ndev_priv *priv = NULL;
+	struct net_device *netdev = NULL;
+	u64 total_fifo_ovr = 0;
+	int idx;
+
+	for (idx = 0; idx < CNF10K_BPHY_CPRI_MAX_INTF; idx++) {
+		if (cnf10k_cpri_drv_ctx[idx].cpri_num == cpri_num &&
+		    cnf10k_cpri_drv_ctx[idx].valid) {
+			netdev = cnf10k_cpri_drv_ctx[idx].netdev;
+			priv = netdev_priv(netdev);
+			cnf10k_cpri_update_stats(priv);
+			total_fifo_ovr += priv->stats.fifo_ovr;
+		}
+	}
+
+	return total_fifo_ovr;
 }

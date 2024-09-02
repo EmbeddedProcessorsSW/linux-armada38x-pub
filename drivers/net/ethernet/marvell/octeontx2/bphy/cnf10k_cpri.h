@@ -89,6 +89,10 @@ struct cnf10k_ul_cbuf_cfg {
 	void __iomem			*cbuf_virt_addr;
 	/* sw */
 	int				sw_rd_ptr;
+	/* ul monitoring related */
+	u64				ul_fifo_ovr_cnt;
+	u64				ul_recovery_cnt;
+	bool				flush;
 	/* ul lock */
 	spinlock_t			lock;
 };
