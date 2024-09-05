@@ -267,7 +267,6 @@ struct otx2_hw {
 	struct otx2_lmt_info	__percpu *lmt_info;
 };
 
-
 struct vfvlan {
 	u16 vlan;
 	u16 proto;
