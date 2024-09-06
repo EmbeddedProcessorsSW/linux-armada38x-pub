@@ -3936,3 +3936,33 @@ int rvu_mbox_handler_npc_mcam_entry_stats(struct rvu *rvu,
 
 	return 0;
 }
+
+void rvu_npc_clear_ucast_entry(struct rvu *rvu, int pcifunc, int nixlf)
+{
+	struct npc_mcam *mcam = &rvu->hw->mcam;
+	struct rvu_npc_mcam_rule *rule;
+	int ucast_idx, blkaddr;
+
+	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NPC, 0);
+	if (blkaddr < 0)
+		return;
+
+	ucast_idx = npc_get_nixlf_mcam_index(rvu, mcam, pcifunc,
+					     nixlf, NIXLF_UCAST_ENTRY);
+
+	npc_enable_mcam_entry(rvu, mcam, blkaddr, ucast_idx, false);
+
+	npc_set_mcam_action(rvu, mcam, blkaddr, ucast_idx, 0);
+
+	npc_clear_mcam_entry(rvu, mcam, blkaddr, ucast_idx);
+
+	mutex_lock(&mcam->lock);
+	list_for_each_entry(rule, &mcam->mcam_rules, list) {
+		if (rule->entry == ucast_idx) {
+			list_del(&rule->list);
+			kfree(rule);
+			break;
+		}
+	}
+	mutex_unlock(&mcam->lock);
+}
