@@ -3794,10 +3794,10 @@ static int rvu_enable_sriov(struct rvu *rvu)
 		return 0;
 
 	/* LBK channel number 63 is used for switching packets between
-	 * CGX mapped VFs. Hence limit LBK pairs till 62 only.
+	 * CGX mapped VFs. Hence limit LBK pairs.
 	 */
-	if (rvu->vf_devid == PCI_DEVID_OCTEONTX2_RVU_AFVF && vfs > 62)
-		vfs = 62;
+	if (rvu->vf_devid == PCI_DEVID_OCTEONTX2_RVU_AFVF && vfs > (chans - 2))
+		vfs = chans - 2;
 
 	/* Save VFs number for reference in VF interrupts handlers.
 	 * Since interrupts might start arriving during SRIOV enablement
