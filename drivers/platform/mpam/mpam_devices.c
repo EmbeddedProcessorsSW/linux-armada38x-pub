@@ -2058,7 +2058,8 @@ static int __allocate_component_cfg(struct mpam_component *comp)
 	if (comp->cfg)
 		return 0;
 
-	comp->cfg = kcalloc(mpam_partid_max, sizeof(*comp->cfg), GFP_KERNEL);
+	comp->cfg = kcalloc(mpam_partid_max + 1, sizeof(*comp->cfg),
+			    GFP_KERNEL);
 	if (!comp->cfg)
 		return -ENOMEM;
 
@@ -2228,7 +2229,8 @@ void mpam_reset_class(struct mpam_class *class)
 	idx = srcu_read_lock(&mpam_srcu);
 	list_for_each_entry_srcu(comp, &class->components, class_list,
 				 srcu_read_lock_held(&mpam_srcu)) {
-		memset(comp->cfg, 0, (mpam_partid_max * sizeof(*comp->cfg)));
+		memset(comp->cfg, 0,
+		       ((mpam_partid_max + 1) * sizeof(*comp->cfg)));
 
 		list_for_each_entry_srcu(ris, &comp->ris, comp_list,
 					 srcu_read_lock_held(&mpam_srcu)) {
