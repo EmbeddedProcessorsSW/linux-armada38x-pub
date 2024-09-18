@@ -421,6 +421,7 @@ int rvu_mbox_handler_get_rep_cnt(struct rvu *rvu, struct msg_req *req,
 	}
 
 	/* Initialize the wq for handling REP events */
+	spin_lock_init(&rvu->rep_evtq_lock);
 	INIT_LIST_HEAD(&rvu->rep_evtq_head);
 	INIT_WORK(&rvu->rep_evt_work, rvu_rep_wq_handler);
 	rvu->rep_evt_wq = alloc_workqueue("rep_evt_wq", 0, 0);
