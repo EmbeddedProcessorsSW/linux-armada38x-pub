@@ -331,6 +331,49 @@ static void rvu_rep_free_cq_rsrc(struct otx2_nic *priv)
 	otx2_disable_napi(priv);
 }
 
+static void rvu_rep_rsrc_free(struct otx2_nic *priv)
+{
+	struct otx2_qset *qset = &priv->qset;
+	int wrk;
+
+	for (wrk = 0; wrk < priv->qset.cq_cnt; wrk++)
+		cancel_delayed_work_sync(&priv->refill_wrk[wrk].pool_refill_work);
+	devm_kfree(priv->dev, priv->refill_wrk);
+
+	otx2_free_hw_resources(priv);
+	otx2_free_queue_mem(qset);
+}
+
+static int rvu_rep_rsrc_init(struct otx2_nic *priv)
+{
+	struct otx2_qset *qset = &priv->qset;
+	int err;
+
+	err = otx2_alloc_queue_mem(priv);
+	if (err)
+		return err;
+
+	priv->hw.max_mtu = otx2_get_max_mtu(priv);
+	priv->tx_max_pktlen = priv->hw.max_mtu + OTX2_ETH_HLEN;
+	priv->rbsize = ALIGN(priv->hw.rbuf_len, OTX2_ALIGN) + OTX2_HEAD_ROOM;
+
+	err = otx2_init_hw_resources(priv);
+	if (err)
+		goto err_free_rsrc;
+
+	/* Set maximum frame size allowed in HW */
+	err = otx2_hw_set_mtu(priv, priv->hw.max_mtu);
+	if (err) {
+		dev_err(priv->dev, "Failed to set HW MTU\n");
+		goto err_free_rsrc;
+	}
+	return 0;
+
+err_free_rsrc:
+	otx2_free_hw_resources(priv);
+	otx2_free_queue_mem(qset);
+	return err;
+}
 void rvu_rep_destroy(struct otx2_nic *priv)
 {
 	struct rep_dev *rep;
@@ -345,6 +388,7 @@ void rvu_rep_destroy(struct otx2_nic *priv)
 		free_netdev(rep->netdev);
 	}
 	kfree(priv->reps);
+	rvu_rep_rsrc_free(priv);
 }
 
 int rvu_rep_create(struct otx2_nic *priv, struct netlink_ext_ack *extack)
@@ -355,9 +399,15 @@ int rvu_rep_create(struct otx2_nic *priv, struct netlink_ext_ack *extack)
 	int rep_id, err;
 	u16 pcifunc;
 
-	priv->reps = kcalloc(rep_cnt, sizeof(struct rep_dev *), GFP_KERNEL);
-	if (!priv->reps)
+	err = rvu_rep_rsrc_init(priv);
+	if (err)
 		return -ENOMEM;
+
+	priv->reps = kcalloc(rep_cnt, sizeof(struct rep_dev *), GFP_KERNEL);
+	if (!priv->reps) {
+		err = -ENOMEM;
+		goto exit;
+	}
 
 	for (rep_id = 0; rep_id < rep_cnt; rep_id++) {
 		ndev = alloc_etherdev(sizeof(*rep));
@@ -407,52 +457,10 @@ exit:
 		free_netdev(rep->netdev);
 	}
 	kfree(priv->reps);
+	rvu_rep_rsrc_free(priv);
 	return err;
 }
 
-static void rvu_rep_rsrc_free(struct otx2_nic *priv)
-{
-	struct otx2_qset *qset = &priv->qset;
-	int wrk;
-
-	for (wrk = 0; wrk < priv->qset.cq_cnt; wrk++)
-		cancel_delayed_work_sync(&priv->refill_wrk[wrk].pool_refill_work);
-	devm_kfree(priv->dev, priv->refill_wrk);
-
-	otx2_free_hw_resources(priv);
-	otx2_free_queue_mem(qset);
-}
-
-static int rvu_rep_rsrc_init(struct otx2_nic *priv)
-{
-	struct otx2_qset *qset = &priv->qset;
-	int err;
-
-	err = otx2_alloc_queue_mem(priv);
-	if (err)
-		return err;
-
-	priv->hw.max_mtu = otx2_get_max_mtu(priv);
-	priv->tx_max_pktlen = priv->hw.max_mtu + OTX2_ETH_HLEN;
-	priv->rbsize = ALIGN(priv->hw.rbuf_len, OTX2_ALIGN) + OTX2_HEAD_ROOM;
-
-	err = otx2_init_hw_resources(priv);
-	if (err)
-		goto err_free_rsrc;
-
-	/* Set maximum frame size allowed in HW */
-	err = otx2_hw_set_mtu(priv, priv->hw.max_mtu);
-	if (err) {
-		dev_err(priv->dev, "Failed to set HW MTU\n");
-		goto err_free_rsrc;
-	}
-	return 0;
-
-err_free_rsrc:
-	otx2_free_hw_resources(priv);
-	otx2_free_queue_mem(qset);
-	return err;
-}
 
 static int rvu_get_rep_cnt(struct otx2_nic *priv)
 {
@@ -547,10 +555,6 @@ static int rvu_rep_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (err)
 		goto err_detach_rsrc;
 
-	err = rvu_rep_rsrc_init(priv);
-	if (err)
-		goto err_detach_rsrc;
-
 	err = otx2_register_dl(priv);
 	if (err)
 		goto err_detach_rsrc;
@@ -579,7 +583,6 @@ static void rvu_rep_remove(struct pci_dev *pdev)
 	otx2_unregister_dl(priv);
 	if (!(priv->flags & OTX2_FLAG_INTF_DOWN))
 		rvu_rep_destroy(priv);
-	rvu_rep_rsrc_free(priv);
 	otx2_detach_resources(&priv->mbox);
 	if (priv->hw.lmt_info)
 		free_percpu(priv->hw.lmt_info);
