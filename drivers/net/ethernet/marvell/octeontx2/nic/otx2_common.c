@@ -1795,8 +1795,13 @@ void mbox_handler_cgx_stats(struct otx2_nic *pfvf,
 void mbox_handler_cgx_fec_stats(struct otx2_nic *pfvf,
 				struct cgx_fec_stats_rsp *rsp)
 {
-	pfvf->hw.cgx_fec_corr_blks += rsp->fec_corr_blks;
-	pfvf->hw.cgx_fec_uncorr_blks += rsp->fec_uncorr_blks;
+	if (test_bit(CN10K_RPM, &pfvf->hw.cap_flag)) {
+		pfvf->hw.cgx_fec_corr_blks = rsp->fec_corr_blks;
+		pfvf->hw.cgx_fec_uncorr_blks = rsp->fec_uncorr_blks;
+	} else {
+		pfvf->hw.cgx_fec_corr_blks += rsp->fec_corr_blks;
+		pfvf->hw.cgx_fec_uncorr_blks += rsp->fec_uncorr_blks;
+	}
 }
 
 void mbox_handler_npa_lf_alloc(struct otx2_nic *pfvf,

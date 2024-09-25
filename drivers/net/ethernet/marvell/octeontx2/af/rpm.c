@@ -750,9 +750,9 @@ int rpm_get_fec_stats(void *rpmd, int lmac_id, struct cgx_fec_stats_rsp *rsp)
 		}
 	} else {
 		/* enable RS-FEC capture */
-		cfg = rpm_read(rpm, 0, RPMX_MTI_STAT_STATN_CONTROL);
+		cfg = rpm_read(rpm, 0, RPMX_MTI_RSFEC_STAT_STATN_CONTROL);
 		cfg |= RPMX_RSFEC_RX_CAPTURE | BIT(lmac_id);
-		rpm_write(rpm, 0, RPMX_MTI_STAT_STATN_CONTROL, cfg);
+		rpm_write(rpm, 0, RPMX_MTI_RSFEC_STAT_STATN_CONTROL, cfg);
 
 		val_lo = rpm_read(rpm, 0,
 				  RPMX_MTI_RSFEC_STAT_COUNTER_CAPTURE_2);
