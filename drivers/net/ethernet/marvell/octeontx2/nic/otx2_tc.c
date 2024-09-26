@@ -31,30 +31,6 @@
 
 #define MCAST_INVALID_GRP		(-1U)
 
-struct otx2_tc_flow_stats {
-	u64 bytes;
-	u64 pkts;
-	u64 used;
-};
-
-struct otx2_tc_flow {
-	struct list_head		list;
-	unsigned long			cookie;
-	struct rcu_head			rcu;
-	struct otx2_tc_flow_stats	stats;
-	spinlock_t			lock; /* lock for stats */
-	u16				rq;
-	u16				entry;
-	u16				leaf_profile;
-	bool				is_act_police;
-	u32				prio;
-	struct npc_install_flow_req	req;
-	u64				rate;
-	u32				burst;
-	u32				mcast_grp_idx;
-	bool				is_pps;
-};
-
 static void otx2_get_egress_burst_cfg(struct otx2_nic *nic, u32 burst,
 				      u32 *burst_exp, u32 *burst_mantissa)
 {
@@ -977,8 +953,8 @@ static struct otx2_tc_flow *otx2_tc_get_entry_by_cookie(struct otx2_flow_config 
 	return NULL;
 }
 
-static struct otx2_tc_flow *otx2_tc_get_entry_by_index(struct otx2_flow_config *flow_cfg,
-						       int index)
+struct otx2_tc_flow *otx2_tc_get_entry_by_index(struct otx2_flow_config *flow_cfg,
+						int index)
 {
 	struct otx2_tc_flow *tmp;
 	int i = 0;
@@ -1007,8 +983,8 @@ static void otx2_tc_del_from_flow_list(struct otx2_flow_config *flow_cfg,
 	}
 }
 
-static int otx2_tc_add_to_flow_list(struct otx2_flow_config *flow_cfg,
-				    struct otx2_tc_flow *node)
+int otx2_tc_add_to_flow_list(struct otx2_flow_config *flow_cfg,
+			     struct otx2_tc_flow *node)
 {
 	struct list_head *pos, *n;
 	struct otx2_tc_flow *tmp;
@@ -1031,7 +1007,7 @@ static int otx2_tc_add_to_flow_list(struct otx2_flow_config *flow_cfg,
 	return index;
 }
 
-static int otx2_add_mcam_flow_entry(struct otx2_nic *nic, struct npc_install_flow_req *req)
+int otx2_add_mcam_flow_entry(struct otx2_nic *nic, struct npc_install_flow_req *req)
 {
 	struct npc_install_flow_req *tmp_req;
 	int err;
@@ -1057,7 +1033,7 @@ static int otx2_add_mcam_flow_entry(struct otx2_nic *nic, struct npc_install_flo
 	return 0;
 }
 
-static int otx2_del_mcam_flow_entry(struct otx2_nic *nic, u16 entry, u16 *cntr_val)
+int otx2_del_mcam_flow_entry(struct otx2_nic *nic, u16 entry, u16 *cntr_val)
 {
 	struct npc_delete_flow_rsp *rsp;
 	struct npc_delete_flow_req *req;
@@ -1107,6 +1083,11 @@ static int otx2_tc_update_mcam_table_del_req(struct otx2_nic *nic,
 	int i = 0, index = 0;
 	u16 cntr_val = 0;
 
+	if (is_cn20k(nic->pdev)) {
+		cn20k_tc_update_mcam_table_del_req(nic, flow_cfg, node);
+		return 0;
+	}
+
 	/* Find and delete the entry from the list and re-install
 	 * all the entries from beginning to the index of the
 	 * deleted entry to higher mcam indexes.
@@ -1146,6 +1127,9 @@ static int otx2_tc_update_mcam_table_add_req(struct otx2_nic *nic,
 	int list_idx, i;
 	u16 cntr_val = 0;
 
+	if (is_cn20k(nic->pdev))
+		return cn20k_tc_update_mcam_table_add_req(nic, flow_cfg, node);
+
 	/* Find the index of the entry(list_idx) whose priority
 	 * is greater than the new entry and re-install all
 	 * the entries from beginning to list_idx to higher
@@ -1165,7 +1149,7 @@ static int otx2_tc_update_mcam_table_add_req(struct otx2_nic *nic,
 		mcam_idx++;
 	}
 
-	return mcam_idx;
+	return flow_cfg->flow_ent[mcam_idx];
 }
 
 static int otx2_tc_update_mcam_table(struct otx2_nic *nic,
@@ -1247,7 +1231,7 @@ static int otx2_tc_add_flow(struct otx2_nic *nic,
 	struct otx2_flow_config *flow_cfg = nic->flow_cfg;
 	struct otx2_tc_flow *new_node, *old_node;
 	struct npc_install_flow_req *req, dummy;
-	int rc, err, mcam_idx;
+	int rc, err, entry;
 
 	if (!(nic->flags & OTX2_FLAG_TC_FLOWER_SUPPORT))
 		return -ENOMEM;
@@ -1257,7 +1241,7 @@ static int otx2_tc_add_flow(struct otx2_nic *nic,
 		return -EINVAL;
 	}
 
-	if (flow_cfg->nr_flows == flow_cfg->max_flows) {
+	if (!is_cn20k(nic->pdev) && flow_cfg->nr_flows == flow_cfg->max_flows) {
 		NL_SET_ERR_MSG_MOD(extack,
 				   "Free MCAM entry not available to add the flow");
 		return -ENOMEM;
@@ -1285,7 +1269,22 @@ static int otx2_tc_add_flow(struct otx2_nic *nic,
 	if (old_node)
 		otx2_tc_del_flow(nic, tc_flow_cmd);
 
-	mcam_idx = otx2_tc_update_mcam_table(nic, flow_cfg, new_node, true);
+	if (is_cn20k(nic->pdev)) {
+		rc = cn20k_tc_alloc_entry(nic, tc_flow_cmd, new_node, &dummy);
+		if (rc) {
+			NL_SET_ERR_MSG_MOD(extack, "MCAM rule allocation failed");
+			kfree_rcu(new_node, rcu);
+			return rc;
+		}
+	}
+
+	entry = otx2_tc_update_mcam_table(nic, flow_cfg, new_node, true);
+	if (entry < 0) {
+		NL_SET_ERR_MSG_MOD(extack, "Adding rule failed");
+		rc = entry;
+		goto free_leaf;
+	}
+
 	mutex_lock(&nic->mbox.lock);
 	req = otx2_mbox_alloc_msg_npc_install_flow(&nic->mbox);
 	if (!req) {
@@ -1297,7 +1296,7 @@ static int otx2_tc_add_flow(struct otx2_nic *nic,
 	memcpy(&dummy.hdr, &req->hdr, sizeof(struct mbox_msghdr));
 	memcpy(req, &dummy, sizeof(struct npc_install_flow_req));
 	req->channel = nic->hw.rx_chan_base;
-	req->entry = flow_cfg->flow_ent[mcam_idx];
+	req->entry = (u16)entry;
 	req->intf = NIX_INTF_RX;
 	req->set_cntr = 1;
 	new_node->entry = req->entry;
