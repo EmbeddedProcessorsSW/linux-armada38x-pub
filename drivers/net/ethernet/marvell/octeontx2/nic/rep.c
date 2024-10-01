@@ -28,6 +28,60 @@ MODULE_DESCRIPTION(DRV_STRING);
 MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(pci, rvu_rep_id_table);
 
+static struct devlink_port *
+rvu_rep_get_devlink_port(struct net_device *netdev)
+{
+	struct rep_dev *rep = netdev_priv(netdev);
+
+	return &rep->dl_port;
+}
+
+static void
+rvu_rep_devlink_set_switch_id(struct otx2_nic *priv,
+			      struct netdev_phys_item_id *ppid)
+{
+	struct pci_dev *pdev = priv->pdev;
+	u64 id;
+
+	id = pci_get_dsn(pdev);
+
+	ppid->id_len = sizeof(id);
+	put_unaligned_be64(id, &ppid->id);
+}
+
+static void rvu_rep_devlink_port_unregister(struct rep_dev *rep)
+{
+	devlink_port_unregister(&rep->dl_port);
+}
+
+static int rvu_rep_devlink_port_register(struct rep_dev *rep)
+{
+	struct devlink_port_attrs attrs = {};
+	struct otx2_nic *priv = rep->mdev;
+	struct devlink *dl = priv->dl->dl;
+	int err;
+
+	if (!(rep->pcifunc & RVU_PFVF_FUNC_MASK)) {
+		attrs.flavour = DEVLINK_PORT_FLAVOUR_PHYSICAL;
+		attrs.phys.port_number = rvu_get_pf(rep->pcifunc);
+	} else {
+		attrs.flavour = DEVLINK_PORT_FLAVOUR_PCI_VF;
+		attrs.pci_vf.pf = rvu_get_pf(rep->pcifunc);
+		attrs.pci_vf.vf = rep->pcifunc & RVU_PFVF_FUNC_MASK;
+	}
+
+	rvu_rep_devlink_set_switch_id(priv, &attrs.switch_id);
+	devlink_port_attrs_set(&rep->dl_port, &attrs);
+
+	err = devlink_port_register(dl, &rep->dl_port, rep->rep_id);
+	if (err) {
+		dev_err(rep->mdev->dev, "devlink_port_register failed: %d\n",
+			err);
+		return err;
+	}
+	return 0;
+}
+
 static int rvu_rep_get_repid(struct otx2_nic *priv, u16 pcifunc)
 {
 	int rep_id;
@@ -215,6 +269,9 @@ static int rvu_rep_open(struct net_device *dev)
 	netif_carrier_on(dev);
 	netif_tx_start_all_queues(dev);
 
+	if (rep->pcifunc & RVU_PFVF_FUNC_MASK)
+		return 0;
+
 	evt.event = RVU_EVENT_PORT_STATE;
 	evt.evt_data.port_state = 1;
 	evt.pcifunc = rep->pcifunc;
@@ -234,6 +291,9 @@ static int rvu_rep_stop(struct net_device *dev)
 	netif_carrier_off(dev);
 	netif_tx_disable(dev);
 
+	if (rep->pcifunc & RVU_PFVF_FUNC_MASK)
+		return 0;
+
 	evt.event = RVU_EVENT_PORT_STATE;
 	evt.pcifunc = rep->pcifunc;
 	rvu_rep_notify_pfvf(priv, RVU_EVENT_PORT_STATE, &evt);
@@ -246,6 +306,7 @@ static const struct net_device_ops rvu_rep_netdev_ops = {
 	.ndo_start_xmit		= rvu_rep_xmit,
 	.ndo_get_stats64	= rvu_rep_get_stats64,
 	.ndo_change_mtu		= rvu_rep_change_mtu,
+	.ndo_get_devlink_port	= rvu_rep_get_devlink_port,
 };
 
 static int rvu_rep_napi_init(struct otx2_nic *priv,
@@ -385,6 +446,7 @@ void rvu_rep_destroy(struct otx2_nic *priv)
 	for (rep_id = 0; rep_id < priv->rep_cnt; rep_id++) {
 		rep = priv->reps[rep_id];
 		unregister_netdev(rep->netdev);
+		rvu_rep_devlink_port_unregister(rep);
 		free_netdev(rep->netdev);
 	}
 	kfree(priv->reps);
@@ -431,8 +493,12 @@ int rvu_rep_create(struct otx2_nic *priv, struct netlink_ext_ack *extack)
 		pcifunc = priv->rep_pf_map[rep_id];
 		rep->pcifunc = pcifunc;
 
-		snprintf(ndev->name, sizeof(ndev->name), "r%dp%dv%d", rep_id,
+		snprintf(ndev->name, sizeof(ndev->name), "Rpf%dvf%d",
 			 rvu_get_pf(pcifunc), (pcifunc & RVU_PFVF_FUNC_MASK));
+
+		err = rvu_rep_devlink_port_register(rep);
+		if (err)
+			goto exit;
 
 		eth_hw_addr_random(ndev);
 		err = register_netdev(ndev);
@@ -442,6 +508,7 @@ int rvu_rep_create(struct otx2_nic *priv, struct netlink_ext_ack *extack)
 			goto exit;
 		}
 
+		devlink_port_type_eth_set(&rep->dl_port, ndev);
 		INIT_DELAYED_WORK(&rep->stats_wrk, rvu_rep_get_stats);
 	}
 	err = rvu_rep_napi_init(priv, extack);
@@ -454,6 +521,7 @@ exit:
 	while (--rep_id >= 0) {
 		rep = priv->reps[rep_id];
 		unregister_netdev(rep->netdev);
+		rvu_rep_devlink_port_unregister(rep);
 		free_netdev(rep->netdev);
 	}
 	kfree(priv->reps);
@@ -580,9 +648,9 @@ static void rvu_rep_remove(struct pci_dev *pdev)
 {
 	struct otx2_nic *priv = pci_get_drvdata(pdev);
 
-	otx2_unregister_dl(priv);
 	if (!(priv->flags & OTX2_FLAG_INTF_DOWN))
 		rvu_rep_destroy(priv);
+	otx2_unregister_dl(priv);
 	otx2_detach_resources(&priv->mbox);
 	if (priv->hw.lmt_info)
 		free_percpu(priv->hw.lmt_info);
