@@ -380,12 +380,6 @@ int rvu_mbox_handler_esw_cfg(struct rvu *rvu, struct esw_cfg_req *req,
 		return 0;
 
 	rvu->rep_mode = req->ena;
-
-	if (req->ena)
-		rvu_switch_enable(rvu);
-	else
-		rvu_switch_disable(rvu);
-
 	return 0;
 }
 
