@@ -215,7 +215,7 @@ u8 cgx_lmac_get_p2x(int cgx_id, int lmac_id)
 	return (cfg & CMR_P2X_SEL_MASK) >> CMR_P2X_SEL_SHIFT;
 }
 
-u8 cgx_get_nix_resetbit(struct cgx *cgx)
+static u8 cgx_get_nix_resetbit(struct cgx *cgx)
 {
 	int first_lmac;
 	u8 p2x;
@@ -2133,7 +2133,7 @@ static u8 cgx_get_rxid_mapoffset(struct cgx *cgx)
 		return 0x60;
 }
 
-void cgx_x2p_reset(void *cgxd, bool enable)
+static void cgx_x2p_reset(void *cgxd, bool enable)
 {
 	struct cgx *cgx = cgxd;
 	int lmac_id;
@@ -2155,7 +2155,7 @@ void cgx_x2p_reset(void *cgxd, bool enable)
 	}
 }
 
-int cgx_enadis_rx(void *cgxd, int lmac_id, bool enable)
+static int cgx_enadis_rx(void *cgxd, int lmac_id, bool enable)
 {
 	struct cgx *cgx = cgxd;
 	u64 cfg;

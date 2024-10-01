@@ -324,7 +324,7 @@ irqreturn_t cn20k_vfaf_mbox_intr_handler(int irq, void *vf_irq)
 	return IRQ_HANDLED;
 }
 
-void cn20k_enable_pfvf_mbox_intr(struct otx2_nic *pf, int numvfs)
+static void cn20k_enable_pfvf_mbox_intr(struct otx2_nic *pf, int numvfs)
 {
 	/* Clear PF <=> VF mailbox IRQ */
 	otx2_write64(pf, RVU_MBOX_PF_VFPF_INTX(0), ~0ull);

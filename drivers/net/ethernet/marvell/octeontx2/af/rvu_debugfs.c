@@ -1575,9 +1575,7 @@ static int rvu_dbg_nix_tm_tree_display(struct seq_file *m, void *unused)
 	struct nix_aq_enq_rsp rsp;
 	struct rvu_pfvf *pfvf;
 	u16 pcifunc;
-	int blkaddr;
 
-	blkaddr = nix_hw->blkaddr;
 	nixlf = rvu->rvu_dbg.nix_tm_ctx.lf;
 	id = rvu->rvu_dbg.nix_tm_ctx.id;
 
@@ -1801,23 +1799,17 @@ static void print_tm_topo(struct seq_file *m, u64 schq, u32 lvl)
 /*dumps given tm_topo registers*/
 static int rvu_dbg_nix_tm_topo_display(struct seq_file *m, void *unused)
 {
-	int nixlf, lvl, schq, blkaddr, id, max_id = 0;
 	struct nix_hw *nix_hw = m->private;
 	struct rvu *rvu = nix_hw->rvu;
 	struct nix_aq_enq_req aq_req;
 	struct nix_txsch *txsch;
-	struct rvu_pfvf *pfvf;
+	int nixlf, lvl, schq;
 	u16 pcifunc;
 
-	blkaddr = nix_hw->blkaddr;
 	nixlf = rvu->rvu_dbg.nix_tm_ctx.lf;
-	id = rvu->rvu_dbg.nix_tm_ctx.id;
 
 	if (!rvu_dbg_is_valid_lf(rvu, nix_hw->blkaddr, nixlf, &pcifunc))
 		return -EINVAL;
-
-	pfvf = rvu_get_pfvf(rvu, pcifunc);
-	max_id = pfvf->sq_ctx->qsize;
 
 	memset(&aq_req, 0, sizeof(struct nix_aq_enq_req));
 	aq_req.hdr.pcifunc = pcifunc;

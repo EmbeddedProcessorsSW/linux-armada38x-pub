@@ -550,7 +550,7 @@ end:
 	}
 }
 
-irqreturn_t otx2_pfvf_mbox_intr_handler(int irq, void *pf_irq)
+static irqreturn_t otx2_pfvf_mbox_intr_handler(int irq, void *pf_irq)
 {
 	struct otx2_nic *pf = (struct otx2_nic *)(pf_irq);
 	int vfs = pf->total_vfs;
