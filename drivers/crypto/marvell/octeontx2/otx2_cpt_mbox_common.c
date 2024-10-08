@@ -25,6 +25,7 @@ void otx2_cpt_sync_mbox_bbuf(struct otx2_mbox *mbox, int devid)
 	memcpy(mdev->mbase + mbox->rx_start,
 	       hw_mbase + mbox->rx_start, msg_size + msgs_offset);
 }
+EXPORT_SYMBOL_NS_GPL(otx2_cpt_sync_mbox_bbuf, CRYPTO_DEV_OCTEONTX2_CPT);
 
 int otx2_cpt_send_mbox_msg(struct otx2_mbox *mbox, struct pci_dev *pdev)
 {
