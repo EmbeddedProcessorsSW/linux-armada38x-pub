@@ -149,4 +149,7 @@ static inline u64 pf_to_bitoff(u8 pf)
 	offset = (0x8000080ull | (a) << 8 | (b) << 22);		\
 	offset; })
 
+#define NIX_AF_LSO_ALT_FLAGS_CFG(a)	(0x4B00 | (a) << 3)
+#define NIX_AF_LSO_ALT_FLAGS_CFG1(a)	(0x4B20 | (a) << 3)
+
 #endif /* RVU_MBOX_REG_H */

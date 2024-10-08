@@ -448,6 +448,8 @@ M(NIX_MCAST_GRP_UPDATE, 0x802d, nix_mcast_grp_update,				\
 M(NIX_GET_LF_STATS,	0x802e, nix_get_lf_stats, nix_get_lf_stats_req, nix_lf_stats)	\
 M(NIX_CN20K_AQ_ENQ,	0x802f, nix_cn20k_aq_enq, nix_cn20k_aq_enq_req,		\
 				nix_cn20k_aq_enq_rsp)				\
+M(NIX_LSO_ALT_FLAGS_CFG, 0x8030, nix_lso_alt_flags_cfg, nix_lso_alt_flags_cfg_req, \
+				nix_lso_alt_flags_cfg_rsp)			\
 /* MCS mbox IDs (range 0xA000 - 0xBFFF) */					\
 M(MCS_ALLOC_RESOURCES,	0xa000, mcs_alloc_resources, mcs_alloc_rsrc_req,	\
 				mcs_alloc_rsrc_rsp)				\
@@ -1046,6 +1048,8 @@ enum nix_af_status {
 	NIX_AF_ERR_INVALID_MCAST_GRP	= -436,
 	NIX_AF_ERR_INVALID_MCAST_DEL_REQ = -437,
 	NIX_AF_ERR_NON_CONTIG_MCE_LIST = -438,
+	NIX_AF_ERR_LSO_ALT_FLAGS_UNSUPPORTED = -439,
+	NIX_AF_ERR_LSO_ALT_FLAGS_CFG_FAIL = -440,
 };
 
 /* For NIX RX vtag action  */
@@ -1702,6 +1706,17 @@ struct nix_lf_stats {
 		u64 drop;
 		u64 octs;
 	} tx;
+};
+
+struct nix_lso_alt_flags_cfg_req {
+	struct mbox_msghdr hdr;
+	u64 cfg;
+	u64 cfg1;
+};
+
+struct nix_lso_alt_flags_cfg_rsp {
+	struct mbox_msghdr hdr;
+	u8 lso_alt_flags_idx;
 };
 
 /* SSO mailbox error codes
