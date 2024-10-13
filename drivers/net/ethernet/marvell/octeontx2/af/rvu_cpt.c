@@ -19,9 +19,6 @@
 /* Length of initial context fetch in 128 byte words */
 #define CPT_CTX_ILEN    1ULL
 
-/* Max RXC queues */
-#define CPT_AF_MAX_RXC_QUEUES 16
-
 #define cpt_get_eng_sts(e_min, e_max, rsp, etype)                   \
 ({                                                                  \
 	u64 free_sts = 0, busy_sts = 0;                             \
@@ -1096,7 +1093,7 @@ int rvu_mbox_handler_cpt_rxc_time_cfg(struct rvu *rvu,
 
 	if (is_cn20k(rvu->pdev)) {
 		if  (req->queue_id >= CPT_AF_MAX_RXC_QUEUES)
-			return CPT_AF_ERR_RXC_QUE_INVALID;
+			return CPT_AF_ERR_RXC_QUEUE_INVALID;
 
 		cpt_cn20k_rxc_time_cfg(rvu, blkaddr, req, NULL);
 		return 0;
@@ -1533,6 +1530,9 @@ int rvu_cpt_init(struct rvu *rvu)
 		reg_val |= 0xC0ULL << 32;
 		rvu_write64(rvu, BLKADDR_CPT0, CPT_AF_RXC_CFG1, reg_val);
 	}
+
+	if (is_cn20k(rvu->pdev))
+		rvu_cn20k_cpt_init(rvu);
 
 	spin_lock_init(&rvu->cpt_intr_lock);
 

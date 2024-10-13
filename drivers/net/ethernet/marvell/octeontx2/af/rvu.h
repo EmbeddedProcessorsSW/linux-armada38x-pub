@@ -15,6 +15,7 @@
 #include "rvu_struct.h"
 #include "rvu_devlink.h"
 #include "common.h"
+#include "rvu_cpt.h"
 #include "mbox.h"
 #include "mcs_fips_mbox.h"
 #include "npc.h"
@@ -678,6 +679,8 @@ struct rvu {
 	spinlock_t		mcs_intrq_lock;
 	/* CPT interrupt lock */
 	spinlock_t		cpt_intr_lock;
+
+	struct rvu_cpt		cpt;
 
 	struct mutex		mbox_lock; /* Serialize mbox up and down msgs */
 	u16			rep_pcifunc;
