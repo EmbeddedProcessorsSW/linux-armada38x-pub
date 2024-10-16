@@ -47,6 +47,8 @@ struct lmac {
 	u8 lmac_type;
 	bool cmd_pend;
 	char *name;
+	u64 fec_corr_blks;
+	u64 fec_uncorr_blks;
 };
 
 /* CGX & RPM has different feature set

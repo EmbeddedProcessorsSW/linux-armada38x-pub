@@ -711,12 +711,14 @@ int rpm_get_fec_stats(void *rpmd, int lmac_id, struct cgx_fec_stats_rsp *rsp)
 {
 	u64 val_lo, val_hi;
 	rpm_t *rpm = rpmd;
+	struct lmac *lmac;
 	u64 cfg;
 
 	if (!is_lmac_valid(rpm, lmac_id))
 		return -ENODEV;
 
-	if (rpm->lmac_idmap[lmac_id]->link_info.fec == OTX2_FEC_NONE)
+	lmac = lmac_pdata(lmac_id, rpm);
+	if (lmac->link_info.fec == OTX2_FEC_NONE)
 		return 0;
 
 	/* latched registers FCFECX_CW_HI/RSFEC_STAT_FAST_DATA_HI_CDC are common
@@ -724,29 +726,29 @@ int rpm_get_fec_stats(void *rpmd, int lmac_id, struct cgx_fec_stats_rsp *rsp)
 	 */
 	mutex_lock(&rpm->lock);
 
-	if (rpm->lmac_idmap[lmac_id]->link_info.fec == OTX2_FEC_BASER) {
-		val_lo = rpm_read(rpm, lmac_id, RPMX_MTI_FCFECX_VL0_CCW_LO);
-		val_hi = rpm_read(rpm, lmac_id, RPMX_MTI_FCFECX_CW_HI);
-		rsp->fec_corr_blks = (val_hi << 16 | val_lo);
+	if (lmac->link_info.fec == OTX2_FEC_BASER) {
+		val_lo = rpm_read(rpm, 0, RPMX_MTI_FCFECX_VL0_CCW_LO(lmac_id));
+		val_hi = rpm_read(rpm, 0, RPMX_MTI_FCFECX_CW_HI(lmac_id));
+		lmac->fec_corr_blks += (val_hi << 16 | val_lo);
 
-		val_lo = rpm_read(rpm, lmac_id, RPMX_MTI_FCFECX_VL0_NCCW_LO);
-		val_hi = rpm_read(rpm, lmac_id, RPMX_MTI_FCFECX_CW_HI);
-		rsp->fec_uncorr_blks = (val_hi << 16 | val_lo);
+		val_lo = rpm_read(rpm, 0, RPMX_MTI_FCFECX_VL0_NCCW_LO(lmac_id));
+		val_hi = rpm_read(rpm, 0, RPMX_MTI_FCFECX_CW_HI(lmac_id));
+		lmac->fec_uncorr_blks += (val_hi << 16 | val_lo);
 
 		/* 50G uses 2 Physical serdes lines */
 		if (rpm->lmac_idmap[lmac_id]->link_info.lmac_type_id ==
 		    LMAC_MODE_50G_R) {
-			val_lo = rpm_read(rpm, lmac_id,
-					  RPMX_MTI_FCFECX_VL1_CCW_LO);
-			val_hi = rpm_read(rpm, lmac_id,
-					  RPMX_MTI_FCFECX_CW_HI);
-			rsp->fec_corr_blks += (val_hi << 16 | val_lo);
+			val_lo = rpm_read(rpm, 0,
+					  RPMX_MTI_FCFECX_VL1_CCW_LO(lmac_id));
+			val_hi = rpm_read(rpm, 0,
+					  RPMX_MTI_FCFECX_CW_HI(lmac_id));
+			lmac->fec_corr_blks += (val_hi << 16 | val_lo);
 
-			val_lo = rpm_read(rpm, lmac_id,
-					  RPMX_MTI_FCFECX_VL1_NCCW_LO);
-			val_hi = rpm_read(rpm, lmac_id,
-					  RPMX_MTI_FCFECX_CW_HI);
-			rsp->fec_uncorr_blks += (val_hi << 16 | val_lo);
+			val_lo = rpm_read(rpm, 0,
+					  RPMX_MTI_FCFECX_VL1_NCCW_LO(lmac_id));
+			val_hi = rpm_read(rpm, 0,
+					  RPMX_MTI_FCFECX_CW_HI(lmac_id));
+			lmac->fec_uncorr_blks += (val_hi << 16 | val_lo);
 		}
 	} else {
 		/* enable RS-FEC capture */
@@ -757,14 +759,16 @@ int rpm_get_fec_stats(void *rpmd, int lmac_id, struct cgx_fec_stats_rsp *rsp)
 		val_lo = rpm_read(rpm, 0,
 				  RPMX_MTI_RSFEC_STAT_COUNTER_CAPTURE_2);
 		val_hi = rpm_read(rpm, 0, RPMX_MTI_RSFEC_STAT_FAST_DATA_HI_CDC);
-		rsp->fec_corr_blks = (val_hi << 32 | val_lo);
+		lmac->fec_corr_blks = (val_hi << 32 | val_lo);
 
 		val_lo = rpm_read(rpm, 0,
 				  RPMX_MTI_RSFEC_STAT_COUNTER_CAPTURE_3);
 		val_hi = rpm_read(rpm, 0, RPMX_MTI_RSFEC_STAT_FAST_DATA_HI_CDC);
-		rsp->fec_uncorr_blks = (val_hi << 32 | val_lo);
+		lmac->fec_uncorr_blks = (val_hi << 32 | val_lo);
 	}
 
+	rsp->fec_corr_blks = lmac->fec_corr_blks;
+	rsp->fec_uncorr_blks = lmac->fec_uncorr_blks;
 	mutex_unlock(&rpm->lock);
 	return 0;
 }

@@ -1732,11 +1732,16 @@ int cgx_set_link_mode(void *cgxd, struct cgx_set_link_mode_args args,
 int cgx_set_fec(u64 fec, int cgx_id, int lmac_id)
 {
 	u64 req = 0, resp;
+	struct lmac *lmac;
 	struct cgx *cgx;
 	int err = 0;
 
 	cgx = cgx_get_pdata(cgx_id);
 	if (!cgx)
+		return -ENXIO;
+
+	lmac = lmac_pdata(lmac_id, cgx);
+	if (!lmac)
 		return -ENXIO;
 
 	req = FIELD_SET(CMDREG_ID, CGX_CMD_SET_FEC, req);
@@ -1745,9 +1750,14 @@ int cgx_set_fec(u64 fec, int cgx_id, int lmac_id)
 	if (err)
 		return err;
 
-	cgx->lmac_idmap[lmac_id]->link_info.fec =
-			FIELD_GET(RESP_LINKSTAT_FEC, resp);
-	return cgx->lmac_idmap[lmac_id]->link_info.fec;
+	lmac->link_info.fec = FIELD_GET(RESP_LINKSTAT_FEC, resp);
+
+	/* Reset stale fec counters */
+	if (fec == lmac->link_info.fec) {
+		lmac->fec_corr_blks = 0;
+		lmac->fec_uncorr_blks = 0;
+	}
+	return lmac->link_info.fec;
 }
 
 int cgx_get_phy_fec_stats(void *cgxd, int lmac_id)
