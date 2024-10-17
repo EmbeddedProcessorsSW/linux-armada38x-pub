@@ -160,4 +160,6 @@ static inline u64 pf_to_bitoff(u8 pf)
 #define NIX_AF_LFX_RX_INLINE_SA_BASE(a, b)	(0x4240 | (a) << 17 | (b) << 3)
 #define NIX_AF_LFX_RX_INLINE_CFG0(a, b)		(0x4280 | (a) << 17 | (b) << 3)
 #define NIX_AF_LFX_RX_INLINE_CFG1(a, b)		(0x42c0 | (a) << 17 | (b) << 3)
+#define NIX_AF_CN20K_RX_CPTX_INST_QSEL(a)	(0x03C0 | (a) << 16)
+#define NIX_AF_CN20K_RX_CPTX_CREDIT(a)		(0x03D0 | (a) << 16)
 #endif /* RVU_MBOX_REG_H */

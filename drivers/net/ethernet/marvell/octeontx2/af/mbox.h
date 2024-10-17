@@ -459,6 +459,8 @@ M(NIX_RX_INLINE_PROFILE_CFG, 0x8031, nix_rx_inl_profile_cfg,			\
 				nix_rx_inl_profile_cfg_rsp)			\
 M(NIX_RX_INLINE_LF_CFG, 0x8032, nix_rx_inl_lf_cfg, nix_rx_inl_lf_cfg_req,	\
 				msg_rsp)					\
+M(NIX_RX_INL_QUEUE_CFG,	0x8033, nix_rx_inl_queue_cfg,				\
+				nix_rx_inline_qcfg_req, msg_rsp)		\
 /* MCS mbox IDs (range 0xA000 - 0xBFFF) */					\
 M(MCS_ALLOC_RESOURCES,	0xa000, mcs_alloc_resources, mcs_alloc_rsrc_req,	\
 				mcs_alloc_rsrc_rsp)				\
@@ -1601,6 +1603,20 @@ struct nix_mcast_grp_update_req {
 struct nix_mcast_grp_update_rsp {
 	struct mbox_msghdr hdr;
 	u32 mce_start_index;
+};
+
+/* Per queue NIX inline IPSec configuration */
+struct nix_rx_inline_qcfg_req {
+	struct mbox_msghdr hdr;
+	u32 cpt_credit;
+	u32 credit_th;
+	u16 cpt_pf_func;
+	u16 bpid;
+	u8 cpt_slot;
+	u8 rx_queue_id;
+	u8 enable;
+	u8 hysteresis;
+	u8 rsvd[32];
 };
 
 /* Global NIX inline IPSec configuration */
