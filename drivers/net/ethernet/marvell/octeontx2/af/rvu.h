@@ -264,6 +264,8 @@ struct rvu_pfvf {
 	u16		ree0_lfs;
 	u16		ree1_lfs;
 	u16		mllfs;
+	u16		dpilfs;
+	u16		dpi1_lfs;
 	u8		cgx_lmac;
 	u8		sso_uniq_ident;
 
@@ -683,6 +685,8 @@ struct rvu {
 	spinlock_t		mcs_intrq_lock;
 	/* CPT interrupt lock */
 	spinlock_t		cpt_intr_lock;
+	/* DPI lock */
+	struct mutex		dpi_rsrc_lock;
 
 	struct rvu_cpt		cpt;
 
@@ -1356,5 +1360,6 @@ void rvu_set_msix_offset(struct rvu *rvu, struct rvu_pfvf *pfvf,
 			 struct rvu_block *block, int lf);
 u16 rvu_get_msix_offset(struct rvu *rvu, struct rvu_pfvf *pfvf, int blkaddr,
 			int lf);
+void __rvu_flr_handler(struct rvu *rvu, u16 pcifunc);
 
 #endif /* RVU_H */

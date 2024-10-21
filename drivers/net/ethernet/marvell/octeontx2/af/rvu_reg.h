@@ -1134,4 +1134,6 @@
 #define APR_LMT_MAP_ENT_SCH_ENA_SHIFT		22
 #define APR_LMT_MAP_ENT_DIS_LINE_PREF_SHIFT	21
 
+#define DPI_AF_BLK_RST			(0x008ull)
+
 #endif /* RVU_REG_H */

@@ -164,6 +164,8 @@ static inline bool is_eblock(int blkaddr)
 	case BLKADDR_REE0:
 	case BLKADDR_REE1:
 	case BLKADDR_ML:
+	case BLKADDR_DPI0:
+	case BLKADDR_DPI1:
 		return true;
 	default:
 		return false;
@@ -392,6 +394,7 @@ void rvu_eblock_module_init(void)
 	 */
 	ree_eb_module_init();
 	ml_eb_module_init();
+	dpi_eb_module_init();
 }
 
 void rvu_eblock_module_exit(void)

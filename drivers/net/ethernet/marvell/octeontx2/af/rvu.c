@@ -33,7 +33,6 @@
 
 static void rvu_clear_msix_offset(struct rvu *rvu, struct rvu_pfvf *pfvf,
 				  struct rvu_block *block, int lf);
-static void __rvu_flr_handler(struct rvu *rvu, u16 pcifunc);
 
 static int rvu_mbox_init(struct rvu *rvu, struct mbox_wq_info *mw,
 			 int type, int num,
@@ -307,6 +306,13 @@ int rvu_get_blkaddr(struct rvu *rvu, int blktype, u16 pcifunc)
 	case BLKTYPE_ML:
 		blkaddr = BLKADDR_ML;
 		goto exit;
+	case BLKTYPE_DPI:
+		/* For now assume DPI0 */
+		if (!pcifunc) {
+			blkaddr = BLKADDR_DPI0;
+			goto exit;
+		}
+		break;
 	}
 
 	/* Check if this is a RVU PF or VF */
@@ -453,6 +459,14 @@ void rvu_update_rsrc_map(struct rvu *rvu, struct rvu_pfvf *pfvf,
 	case BLKADDR_ML:
 		attach ? pfvf->mllfs++ : pfvf->mllfs--;
 		num_lfs = pfvf->mllfs;
+		break;
+	case BLKADDR_DPI0:
+		attach ? pfvf->dpilfs++ : pfvf->dpilfs--;
+		num_lfs = pfvf->dpilfs;
+		break;
+	case BLKADDR_DPI1:
+		attach ? pfvf->dpi1_lfs++ : pfvf->dpi1_lfs--;
+		num_lfs = pfvf->dpi1_lfs;
 		break;
 	}
 
@@ -625,6 +639,8 @@ static void rvu_reset_all_blocks(struct rvu *rvu)
 	rvu_block_reset(rvu, BLKADDR_REE0, REE_AF_BLK_RST);
 	rvu_block_reset(rvu, BLKADDR_REE1, REE_AF_BLK_RST);
 	rvu_block_reset(rvu, BLKADDR_ML, ML_AF_BLK_RST);
+	rvu_block_reset(rvu, BLKADDR_DPI0, DPI_AF_BLK_RST);
+	rvu_block_reset(rvu, BLKADDR_DPI1, DPI_AF_BLK_RST);
 }
 
 void rvu_reset_blk_lfcfg(struct rvu *rvu, struct rvu_block *block)
@@ -1406,6 +1422,10 @@ u16 rvu_get_rsrc_mapcount(struct rvu_pfvf *pfvf, int blkaddr)
 		return pfvf->ree1_lfs;
 	case BLKADDR_ML:
 		return pfvf->mllfs;
+	case BLKADDR_DPI0:
+		return pfvf->dpilfs;
+	case BLKADDR_DPI1:
+		return pfvf->dpi1_lfs;
 	}
 	return 0;
 }
@@ -1430,6 +1450,8 @@ static bool is_blktype_attached(struct rvu_pfvf *pfvf, int blktype)
 		return pfvf->ree0_lfs || pfvf->ree1_lfs;
 	case BLKTYPE_ML:
 		return !!pfvf->mllfs;
+	case BLKTYPE_DPI:
+		return pfvf->dpilfs || pfvf->dpi1_lfs;
 	}
 
 	return false;
@@ -3205,7 +3227,7 @@ static void rvu_sso_pfvf_rst(struct rvu *rvu, u16 pcifunc)
 	}
 }
 
-static void __rvu_flr_handler(struct rvu *rvu, u16 pcifunc)
+void __rvu_flr_handler(struct rvu *rvu, u16 pcifunc)
 {
 	if (rvu_npc_exact_has_match_table(rvu))
 		rvu_npc_exact_reset(rvu, pcifunc);
