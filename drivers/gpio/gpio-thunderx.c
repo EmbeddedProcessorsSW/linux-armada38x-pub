@@ -389,7 +389,7 @@ static struct irq_chip thunderx_gpio_irq_chip = {
 	.irq_set_affinity	= irq_chip_set_affinity_parent,
 	.irq_set_type		= thunderx_gpio_irq_set_type,
 
-	.flags			= IRQCHIP_SET_TYPE_MASKED
+	.flags			= IRQCHIP_SET_TYPE_MASKED | IRQCHIP_IMMUTABLE
 };
 
 static int thunderx_gpio_child_to_parent_hwirq(struct gpio_chip *gc,
@@ -491,6 +491,12 @@ static int thunderx_gpio_probe(struct pci_dev *pdev,
 	if (!txgpio->register_base) {
 		dev_err(dev, "Cannot map PCI resource\n");
 		err = -ENOMEM;
+		goto out;
+	}
+
+	err = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(48));
+	if (err) {
+		dev_err(dev, "DMA mask config failed, abort\n");
 		goto out;
 	}
 
