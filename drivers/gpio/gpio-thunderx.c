@@ -630,6 +630,7 @@ static void thunderx_gpio_remove(struct pci_dev *pdev)
 
 static const struct pci_device_id thunderx_gpio_id_table[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, 0xA00A) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, 0xA007) },
 	{ 0, }	/* end of table */
 };
 
