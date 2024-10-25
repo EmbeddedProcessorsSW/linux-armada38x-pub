@@ -1240,7 +1240,8 @@ static void npc_enadis_default_entries(struct rvu *rvu, u16 pcifunc,
 
 	/* Ucast MCAM match entry of this PF/VF */
 	if (npc_is_feature_supported(rvu, BIT_ULL(NPC_DMAC),
-				     pfvf->nix_rx_intf)) {
+				     pfvf->nix_rx_intf) &&
+	    (!is_rep_dev(rvu, pcifunc))) {
 		index = npc_get_nixlf_mcam_index(rvu, mcam, pcifunc,
 						 nixlf, NIXLF_UCAST_ENTRY);
 		npc_enable_mcam_entry(rvu, mcam, blkaddr, index, enable);
