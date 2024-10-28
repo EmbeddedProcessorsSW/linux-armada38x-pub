@@ -20,6 +20,7 @@
 #include "npc.h"
 #include "rvu_reg.h"
 #include "cn20k/reg.h"
+#include "cn20k/nix.h"
 #include "ptp.h"
 #include "cn20k/rvum_reg.h"
 
@@ -426,6 +427,7 @@ struct nix_hw {
 	struct nix_bp bp;
 	u64    *tx_credits;
 	u64 cc_mcs_cnt;
+	struct nix_cn20k_hw cn20k;
 };
 
 /* RVU block's capabilities or functionality,
