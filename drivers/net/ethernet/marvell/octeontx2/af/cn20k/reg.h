@@ -157,5 +157,7 @@ static inline u64 pf_to_bitoff(u8 pf)
 #define NIX_AF_RX_INLINE_GEN_CFGX(a)		(0x340 | (a) << 3)
 #define NIX_AF_RX_EXTRACT_INLINEX(a)		(0x380 | (a) << 3)
 #define NIX_AF_RX_PROT_FIELDX_INLINEX(a, b)	(0x4c00 | (a) << 6 | (b) << 3)
-
+#define NIX_AF_LFX_RX_INLINE_SA_BASE(a, b)	(0x4240 | (a) << 17 | (b) << 3)
+#define NIX_AF_LFX_RX_INLINE_CFG0(a, b)		(0x4280 | (a) << 17 | (b) << 3)
+#define NIX_AF_LFX_RX_INLINE_CFG1(a, b)		(0x42c0 | (a) << 17 | (b) << 3)
 #endif /* RVU_MBOX_REG_H */
