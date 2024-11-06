@@ -1717,9 +1717,10 @@ static int cdns_xspi_probe(struct platform_device *pdev)
 #endif
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 4);
-	cdns_xspi->lockbase = devm_ioremap_resource(dev, res);
-	if (IS_ERR(cdns_xspi->lockbase)) {
-		dev_err(dev, "FW does not support memory lock\n");
+	if (res)
+		cdns_xspi->lockbase = devm_ioremap_resource(dev, res);
+	if (!res || IS_ERR(cdns_xspi->lockbase)) {
+		dev_info(dev, "FW does not support memory lock\n");
 		cdns_xspi->lockbase = NULL;
 	} else {
 		struct spi_lock *lock = (struct spi_lock *)cdns_xspi->lockbase;
