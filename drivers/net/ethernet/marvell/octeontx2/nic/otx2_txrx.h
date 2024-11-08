@@ -103,6 +103,7 @@ struct otx2_snd_queue {
 	struct queue_stats	stats;
 	u16			sqb_count;
 	u64			*sqb_ptrs;
+	struct xsk_buff_pool    *xsk_pool;
 } ____cacheline_aligned_in_smp;
 
 enum cq_type {
