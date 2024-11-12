@@ -260,6 +260,7 @@ struct rvu_pfvf {
 	u16		cpt1_lfs;
 	u16		ree0_lfs;
 	u16		ree1_lfs;
+	u16		mllfs;
 	u8		cgx_lmac;
 	u8		sso_uniq_ident;
 
@@ -1343,5 +1344,11 @@ int rvu_rep_notify_pfvf_state(struct rvu *rvu, u16 pcifunc, bool enable);
 
 void rvu_reset_blk_lfcfg(struct rvu *rvu, struct rvu_block *block);
 void rvu_scan_block(struct rvu *rvu, struct rvu_block *block);
+void rvu_detach_block(struct rvu *rvu, int pcifunc, int blktype);
+void rvu_update_rsrc_map(struct rvu *rvu, struct rvu_pfvf *pfvf,
+			 struct rvu_block *block, u16 pcifunc, u16 lf,
+			 bool attach);
+void rvu_set_msix_offset(struct rvu *rvu, struct rvu_pfvf *pfvf,
+			 struct rvu_block *block, int lf);
 
 #endif /* RVU_H */

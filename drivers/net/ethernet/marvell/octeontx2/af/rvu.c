@@ -31,8 +31,6 @@
 #define DRV_NAME	"rvu_af"
 #define DRV_STRING      "Marvell OcteonTX2 RVU Admin Function Driver"
 
-static void rvu_set_msix_offset(struct rvu *rvu, struct rvu_pfvf *pfvf,
-				struct rvu_block *block, int lf);
 static void rvu_clear_msix_offset(struct rvu *rvu, struct rvu_pfvf *pfvf,
 				  struct rvu_block *block, int lf);
 static void __rvu_flr_handler(struct rvu *rvu, u16 pcifunc);
@@ -306,6 +304,9 @@ int rvu_get_blkaddr(struct rvu *rvu, int blktype, u16 pcifunc)
 			goto exit;
 		}
 		break;
+	case BLKTYPE_ML:
+		blkaddr = BLKADDR_ML;
+		goto exit;
 	}
 
 	/* Check if this is a RVU PF or VF */
@@ -385,9 +386,9 @@ exit:
 	return -ENODEV;
 }
 
-static void rvu_update_rsrc_map(struct rvu *rvu, struct rvu_pfvf *pfvf,
-				struct rvu_block *block, u16 pcifunc,
-				u16 lf, bool attach)
+void rvu_update_rsrc_map(struct rvu *rvu, struct rvu_pfvf *pfvf,
+			 struct rvu_block *block, u16 pcifunc, u16 lf,
+			 bool attach)
 {
 	int devnum, num_lfs = 0;
 	bool is_pf;
@@ -448,6 +449,10 @@ static void rvu_update_rsrc_map(struct rvu *rvu, struct rvu_pfvf *pfvf,
 	case BLKADDR_REE1:
 		attach ? pfvf->ree1_lfs++ : pfvf->ree1_lfs--;
 		num_lfs = pfvf->ree1_lfs;
+		break;
+	case BLKADDR_ML:
+		attach ? pfvf->mllfs++ : pfvf->mllfs--;
+		num_lfs = pfvf->mllfs;
 		break;
 	}
 
@@ -1394,6 +1399,8 @@ u16 rvu_get_rsrc_mapcount(struct rvu_pfvf *pfvf, int blkaddr)
 		return pfvf->ree0_lfs;
 	case BLKADDR_REE1:
 		return pfvf->ree1_lfs;
+	case BLKADDR_ML:
+		return pfvf->mllfs;
 	}
 	return 0;
 }
@@ -1515,7 +1522,7 @@ int rvu_get_blkaddr_from_slot(struct rvu *rvu, int blktype, u16 pcifunc,
 	return blkaddr;
 }
 
-static void rvu_detach_block(struct rvu *rvu, int pcifunc, int blktype)
+void rvu_detach_block(struct rvu *rvu, int pcifunc, int blktype)
 {
 	struct rvu_pfvf *pfvf = rvu_get_pfvf(rvu, pcifunc);
 	struct rvu_hwinfo *hw = rvu->hw;
@@ -1975,8 +1982,8 @@ static u16 rvu_get_msix_offset(struct rvu *rvu, struct rvu_pfvf *pfvf,
 	return MSIX_VECTOR_INVALID;
 }
 
-static void rvu_set_msix_offset(struct rvu *rvu, struct rvu_pfvf *pfvf,
-				struct rvu_block *block, int lf)
+void rvu_set_msix_offset(struct rvu *rvu, struct rvu_pfvf *pfvf,
+			 struct rvu_block *block, int lf)
 {
 	u16 nvecs, vec, offset;
 	u64 cfg;
