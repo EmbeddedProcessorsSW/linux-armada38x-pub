@@ -1967,8 +1967,8 @@ exit:
 	return err;
 }
 
-static u16 rvu_get_msix_offset(struct rvu *rvu, struct rvu_pfvf *pfvf,
-			       int blkaddr, int lf)
+u16 rvu_get_msix_offset(struct rvu *rvu, struct rvu_pfvf *pfvf, int blkaddr,
+			int lf)
 {
 	u16 vec;
 
