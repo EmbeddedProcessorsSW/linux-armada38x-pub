@@ -65,3 +65,6 @@ void ree_eb_module_init(void);
 void ree_eb_module_exit(void);
 void ml_eb_module_init(void);
 void ml_eb_module_exit(void);
+
+/* ML block */
+int rvu_ml_lf_teardown(struct rvu *rvu, u16 pcifunc, int lf, int slot);
