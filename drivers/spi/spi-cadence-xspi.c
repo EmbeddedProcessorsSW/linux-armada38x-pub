@@ -401,7 +401,6 @@ int xspi_trylock(atomic_t *lock)
 static int unlock_spi_bus(struct cdns_xspi_dev *cdns_xspi)
 {
 	struct spi_lock *lock = cdns_xspi->lockbase;
-	int timeout = SPI_LOCK_TIMEOUT;
 
 	if (cdns_xspi->lockbase) {
 		if (lock->owner == SPI_AP_NS_OWN) {
