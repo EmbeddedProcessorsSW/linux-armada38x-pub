@@ -750,6 +750,11 @@ static void skb_clone_fraglist(struct sk_buff *skb)
 		skb_get(list);
 }
 
+static bool is_pp_page(struct page *page)
+{
+	return (page->pp_magic & ~0x3UL) == PP_SIGNATURE;
+}
+
 static void skb_free_head(struct sk_buff *skb)
 {
 	unsigned char *head = skb->head;
@@ -4676,8 +4681,6 @@ int skb_to_sgvec_nomark(struct sk_buff *skb, struct scatterlist *sg,
 	return __skb_to_sgvec(skb, sg, offset, len, 0);
 }
 EXPORT_SYMBOL_GPL(skb_to_sgvec_nomark);
-
-
 
 /**
  *	skb_cow_data - Check that a socket buffer's data buffers are writable

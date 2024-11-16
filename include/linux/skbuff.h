@@ -635,7 +635,6 @@ struct skb_shared_info {
 #define SKB_DATAREF_SHIFT 16
 #define SKB_DATAREF_MASK ((1 << SKB_DATAREF_SHIFT) - 1)
 
-
 enum {
 	SKB_FCLONE_UNAVAILABLE,	/* skb has no fclone (from head_cache) */
 	SKB_FCLONE_ORIG,	/* orig skb (from fclone_cache) */
@@ -1793,7 +1792,6 @@ static inline bool skb_queue_empty_lockless(const struct sk_buff_head *list)
 	return READ_ONCE(list->next) == (const struct sk_buff *) list;
 }
 
-
 /**
  *	skb_queue_is_last - check if skb is the last entry in the queue
  *	@list: queue head
@@ -1953,7 +1951,6 @@ static inline void __skb_header_release(struct sk_buff *skb)
 	skb->nohdr = 1;
 	atomic_set(&skb_shinfo(skb)->dataref, 1 + (1 << SKB_DATAREF_SHIFT));
 }
-
 
 /**
  *	skb_shared - is the buffer shared
@@ -2376,7 +2373,6 @@ static inline struct sk_buff *__skb_dequeue_tail(struct sk_buff_head *list)
 	return skb;
 }
 struct sk_buff *skb_dequeue_tail(struct sk_buff_head *list);
-
 
 static inline bool skb_is_nonlinear(const struct sk_buff *skb)
 {
@@ -3187,7 +3183,6 @@ static inline struct sk_buff *dev_alloc_skb(unsigned int length)
 	return netdev_alloc_skb(NULL, length);
 }
 
-
 static inline struct sk_buff *__netdev_alloc_skb_ip_align(struct net_device *dev,
 		unsigned int length, gfp_t gfp)
 {
@@ -3373,6 +3368,8 @@ static inline void __skb_frag_ref(skb_frag_t *frag)
 	get_page(skb_frag_page(frag));
 }
 
+bool napi_pp_put_page(struct page *page, bool napi_safe);
+
 /**
  * skb_frag_ref - take an addition reference on a paged fragment of an skb.
  * @skb: the buffer
@@ -3512,13 +3509,11 @@ static inline struct sk_buff *pskb_copy(struct sk_buff *skb,
 	return __pskb_copy(skb, skb_headroom(skb), gfp_mask);
 }
 
-
 static inline struct sk_buff *pskb_copy_for_clone(struct sk_buff *skb,
 						  gfp_t gfp_mask)
 {
 	return __pskb_copy_fclone(skb, skb_headroom(skb), gfp_mask, true);
 }
-
 
 /**
  *	skb_clone_writable - is the header of a clone writable
@@ -3896,7 +3891,6 @@ static inline void skb_frag_list_init(struct sk_buff *skb)
 
 #define skb_walk_frags(skb, iter)	\
 	for (iter = skb_shinfo(skb)->frag_list; iter; iter = iter->next)
-
 
 int __skb_wait_for_more_packets(struct sock *sk, struct sk_buff_head *queue,
 				int *err, long *timeo_p,
