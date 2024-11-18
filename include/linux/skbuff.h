@@ -3370,6 +3370,16 @@ static inline void __skb_frag_ref(skb_frag_t *frag)
 
 bool napi_pp_put_page(struct page *page, bool napi_safe);
 
+static inline void
+skb_page_unref(const struct sk_buff *skb, struct page *page, bool napi_safe)
+{
+#ifdef CONFIG_PAGE_POOL
+	if (skb->pp_recycle && napi_pp_put_page(page, napi_safe))
+		return;
+#endif
+	put_page(page);
+}
+
 /**
  * skb_frag_ref - take an addition reference on a paged fragment of an skb.
  * @skb: the buffer
