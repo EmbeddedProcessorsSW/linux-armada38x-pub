@@ -2753,6 +2753,7 @@ struct cpt_sts_rsp {
 /* Mailbox message request format to configure reassembly timeout. */
 struct cpt_rxc_time_cfg_req {
 	struct mbox_msghdr hdr;
+	u64 cpt_af_rxc_que_cfg;
 	int blkaddr;
 	u32 step;
 	u16 zombie_thres;
