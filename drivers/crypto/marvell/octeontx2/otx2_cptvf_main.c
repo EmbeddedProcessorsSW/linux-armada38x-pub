@@ -417,9 +417,7 @@ static int otx2_cptvf_probe(struct pci_dev *pdev,
 
 	cptvf->blkaddr = (cpt_block_num == 0) ? BLKADDR_CPT0 : BLKADDR_CPT1;
 
-	ret = cptvf_hw_ops_get(cptvf);
-	if (ret)
-		goto unregister_interrupts;
+	cptvf_hw_ops_get(cptvf);
 
 	ret = otx2_cptvf_send_caps_msg(cptvf);
 	if (ret) {

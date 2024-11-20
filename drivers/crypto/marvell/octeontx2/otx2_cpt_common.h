@@ -155,15 +155,12 @@ static inline bool is_dev_otx2(struct pci_dev *pdev)
 
 static inline bool is_dev_cn10ka(struct pci_dev *pdev)
 {
-	if (pdev->subsystem_device == CPT_PCI_SUBSYS_DEVID_CN10K_A)
-		return true;
-
-	return false;
+	return pdev->subsystem_device == CPT_PCI_SUBSYS_DEVID_CN10K_A;
 }
 
 static inline bool is_dev_cn10ka_ax(struct pci_dev *pdev)
 {
-	if ((pdev->subsystem_device == CPT_PCI_SUBSYS_DEVID_CN10K_A) &&
+	if (pdev->subsystem_device == CPT_PCI_SUBSYS_DEVID_CN10K_A &&
 	    ((pdev->revision & 0xFF) == 4 || (pdev->revision & 0xFF) == 0x50 ||
 	     (pdev->revision & 0xff) == 0x51))
 		return true;
@@ -173,15 +170,12 @@ static inline bool is_dev_cn10ka_ax(struct pci_dev *pdev)
 
 static inline bool is_dev_cn10kb(struct pci_dev *pdev)
 {
-	if (pdev->subsystem_device == CPT_PCI_SUBSYS_DEVID_CN10K_B)
-		return true;
-
-	return false;
+	return pdev->subsystem_device == CPT_PCI_SUBSYS_DEVID_CN10K_B;
 }
 
 static inline bool is_dev_cn10ka_b0(struct pci_dev *pdev)
 {
-	if ((pdev->subsystem_device == CPT_PCI_SUBSYS_DEVID_CN10K_A) &&
+	if (pdev->subsystem_device == CPT_PCI_SUBSYS_DEVID_CN10K_A &&
 	    (pdev->revision & 0xFF) == 0x54)
 		return true;
 
@@ -205,7 +199,7 @@ static inline bool cpt_is_errata_38550_exists(struct pci_dev *pdev)
 	return false;
 }
 
-static inline bool cpt_feature_rxc_icb_cnt(struct pci_dev *pdev)
+static inline bool cpt_feature_sgv2(struct pci_dev *pdev)
 {
 	if (!is_dev_otx2(pdev) && !is_dev_cn10ka_ax(pdev))
 		return true;
@@ -213,7 +207,7 @@ static inline bool cpt_feature_rxc_icb_cnt(struct pci_dev *pdev)
 	return false;
 }
 
-static inline bool cpt_feature_sgv2(struct pci_dev *pdev)
+static inline bool cpt_feature_rxc_icb_cnt(struct pci_dev *pdev)
 {
 	if (!is_dev_otx2(pdev) && !is_dev_cn10ka_ax(pdev))
 		return true;

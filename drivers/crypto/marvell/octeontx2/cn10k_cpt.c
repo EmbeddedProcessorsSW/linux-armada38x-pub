@@ -138,7 +138,8 @@ int cn10k_cptvf_lmtst_init(struct otx2_cptvf_dev *cptvf)
 }
 EXPORT_SYMBOL_NS_GPL(cn10k_cptvf_lmtst_init, CRYPTO_DEV_OCTEONTX2_CPT);
 
-void cn10k_cpt_hw_ctx_clear(struct pci_dev *pdev, struct cn10k_cpt_errata_ctx *er_ctx)
+void cn10k_cpt_hw_ctx_clear(struct pci_dev *pdev,
+			    struct cn10k_cpt_errata_ctx *er_ctx)
 {
 	u64 cptr_dma;
 
@@ -162,7 +163,8 @@ void cn10k_cpt_hw_ctx_set(union cn10k_cpt_hw_ctx *hctx, u16 ctx_sz)
 }
 EXPORT_SYMBOL_NS_GPL(cn10k_cpt_hw_ctx_set, CRYPTO_DEV_OCTEONTX2_CPT);
 
-int cn10k_cpt_hw_ctx_init(struct pci_dev *pdev, struct cn10k_cpt_errata_ctx *er_ctx)
+int cn10k_cpt_hw_ctx_init(struct pci_dev *pdev,
+			  struct cn10k_cpt_errata_ctx *er_ctx)
 {
 	union cn10k_cpt_hw_ctx *hctx;
 	u64 cptr_dma;
@@ -210,14 +212,11 @@ void cn10k_cpt_ctx_flush(struct pci_dev *pdev, u64 cptr, bool inval)
 }
 EXPORT_SYMBOL_NS_GPL(cn10k_cpt_ctx_flush, CRYPTO_DEV_OCTEONTX2_CPT);
 
-int cptvf_hw_ops_get(struct otx2_cptvf_dev *cptvf)
+void cptvf_hw_ops_get(struct otx2_cptvf_dev *cptvf)
 {
-	if (!test_bit(CN10K_LMTST, &cptvf->cap_flag)) {
+	if (test_bit(CN10K_LMTST, &cptvf->cap_flag))
+		cptvf->lfs.ops = &cn10k_hw_ops;
+	else
 		cptvf->lfs.ops = &otx2_hw_ops;
-		return 0;
-	}
-	cptvf->lfs.ops = &cn10k_hw_ops;
-
-	return 0;
 }
 EXPORT_SYMBOL_NS_GPL(cptvf_hw_ops_get, CRYPTO_DEV_OCTEONTX2_CPT);

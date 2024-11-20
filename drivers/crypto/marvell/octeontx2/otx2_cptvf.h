@@ -42,8 +42,7 @@ irqreturn_t cptvf_cn20k_pfvf_mbox_intr(int irq, void *arg);
 void otx2_cptvf_pfvf_mbox_handler(struct work_struct *work);
 int otx2_cptvf_send_eng_grp_num_msg(struct otx2_cptvf_dev *cptvf, int eng_type);
 int otx2_cptvf_send_kvf_limits_msg(struct otx2_cptvf_dev *cptvf);
-int otx2_cptvf_mbox_bbuf_init(struct otx2_cptvf_dev *cptvf,
-			      struct pci_dev *pdev);
+int otx2_cptvf_mbox_bbuf_init(struct otx2_cptvf_dev *cptvf, struct pci_dev *pdev);
 int otx2_cptvf_send_caps_msg(struct otx2_cptvf_dev *cptvf);
 
 #endif /* __OTX2_CPTVF_H */

@@ -163,7 +163,8 @@ static void cptlf_set_misc_intrs(struct otx2_cptlfs_info *lfs, u8 enable)
 
 static void cptlf_set_done_intrs(struct otx2_cptlfs_info *lfs, u8 enable)
 {
-	u64 reg = enable ? OTX2_CPT_LF_DONE_INT_ENA_W1S : OTX2_CPT_LF_DONE_INT_ENA_W1C;
+	u64 reg = enable ? OTX2_CPT_LF_DONE_INT_ENA_W1S :
+			   OTX2_CPT_LF_DONE_INT_ENA_W1C;
 	int slot;
 
 	for (slot = 0; slot < lfs->lfs_num; slot++)
@@ -334,7 +335,8 @@ free_irq:
 	otx2_cptlf_unregister_misc_interrupts(lfs);
 	return ret;
 }
-EXPORT_SYMBOL_NS_GPL(otx2_cptlf_register_misc_interrupts, CRYPTO_DEV_OCTEONTX2_CPT);
+EXPORT_SYMBOL_NS_GPL(otx2_cptlf_register_misc_interrupts,
+		     CRYPTO_DEV_OCTEONTX2_CPT);
 
 int otx2_cptlf_register_done_interrupts(struct otx2_cptlfs_info *lfs)
 {
@@ -357,7 +359,8 @@ free_irq:
 	otx2_cptlf_unregister_done_interrupts(lfs);
 	return ret;
 }
-EXPORT_SYMBOL_NS_GPL(otx2_cptlf_register_done_interrupts, CRYPTO_DEV_OCTEONTX2_CPT);
+EXPORT_SYMBOL_NS_GPL(otx2_cptlf_register_done_interrupts,
+		     CRYPTO_DEV_OCTEONTX2_CPT);
 
 void otx2_cptlf_free_irqs_affinity(struct otx2_cptlfs_info *lfs)
 {

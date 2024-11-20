@@ -98,8 +98,9 @@ struct cpt_hw_ops {
 			 struct otx2_cptlf_info *lf);
 	u8 (*cpt_get_compcode)(union otx2_cpt_res_s *result);
 	u8 (*cpt_get_uc_compcode)(union otx2_cpt_res_s *result);
-	struct otx2_cpt_inst_info * (*cpt_sg_info_create)(struct pci_dev *pdev,
-				    struct otx2_cpt_req_info *req, gfp_t gfp);
+	struct otx2_cpt_inst_info *
+	(*cpt_sg_info_create)(struct pci_dev *pdev, struct otx2_cpt_req_info *req,
+			      gfp_t gfp);
 };
 
 #define LMTLINE_SIZE  128
@@ -323,10 +324,12 @@ static inline void otx2_cptlf_set_ctx_flr_flush(struct otx2_cptlf_info *lf)
 	u8 blkaddr = lf->lfs->blkaddr;
 	u64 val;
 
-	val = otx2_cpt_read64(lf->lfs->reg_base, blkaddr, lf->slot, OTX2_CPT_LF_CTX_CTL);
+	val = otx2_cpt_read64(lf->lfs->reg_base, blkaddr, lf->slot,
+			      OTX2_CPT_LF_CTX_CTL);
 	val |= BIT_ULL(0);
 
-	otx2_cpt_write64(lf->lfs->reg_base, blkaddr, lf->slot, OTX2_CPT_LF_CTX_CTL, val);
+	otx2_cpt_write64(lf->lfs->reg_base, blkaddr, lf->slot,
+			 OTX2_CPT_LF_CTX_CTL, val);
 }
 
 static inline void otx2_cptlf_enable_iqueue_exec(struct otx2_cptlf_info *lf)

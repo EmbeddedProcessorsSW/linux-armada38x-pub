@@ -93,12 +93,12 @@ static int otx2_cpt_dl_t106_mode_set(struct devlink *dl, u32 id,
 		return -EPERM;
 
 	if (cpt_feature_sgv2(pdev)) {
-		otx2_cpt_read_af_reg(&cptpf->afpf_mbox, pdev, CPT_AF_CTL, &reg_val,
-				     BLKADDR_CPT0);
+		otx2_cpt_read_af_reg(&cptpf->afpf_mbox, pdev, CPT_AF_CTL,
+				     &reg_val, BLKADDR_CPT0);
 		reg_val &= ~(0x1ULL << 18);
 		reg_val |= ((u64)ctx->val.vu8 & 0x1) << 18;
-		return otx2_cpt_write_af_reg(&cptpf->afpf_mbox, pdev, CPT_AF_CTL,
-					     reg_val, BLKADDR_CPT0);
+		return otx2_cpt_write_af_reg(&cptpf->afpf_mbox, pdev,
+					     CPT_AF_CTL, reg_val, BLKADDR_CPT0);
 	}
 
 	return 0;

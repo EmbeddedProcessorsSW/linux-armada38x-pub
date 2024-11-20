@@ -345,9 +345,9 @@ sg_cleanup:
 	return ret;
 }
 
-static inline struct otx2_cpt_inst_info *cn10k_sgv2_info_create(struct pci_dev *pdev,
-					      struct otx2_cpt_req_info *req,
-					      gfp_t gfp)
+static inline struct otx2_cpt_inst_info *
+cn10k_sgv2_info_create(struct pci_dev *pdev, struct otx2_cpt_req_info *req,
+		       gfp_t gfp)
 {
 	u32 dlen = 0, g_len, sg_len, info_len;
 	int align = OTX2_CPT_DMA_MINALIGN;
@@ -416,9 +416,9 @@ destroy_info:
 
 /* SG list header size in bytes */
 #define SG_LIST_HDR_SIZE	8
-static inline struct otx2_cpt_inst_info *otx2_sg_info_create(struct pci_dev *pdev,
-					      struct otx2_cpt_req_info *req,
-					      gfp_t gfp)
+static inline struct otx2_cpt_inst_info *
+otx2_sg_info_create(struct pci_dev *pdev, struct otx2_cpt_req_info *req,
+		    gfp_t gfp)
 {
 	int align = OTX2_CPT_DMA_MINALIGN;
 	struct otx2_cpt_inst_info *info;
