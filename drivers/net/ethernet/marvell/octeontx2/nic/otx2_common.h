@@ -1256,4 +1256,5 @@ int rvu_event_up_notify(struct otx2_nic *pf, struct rep_event *info);
 void otx2_queue_vf_work(struct mbox *mw, struct workqueue_struct *mbox_wq,
 			int first, int mdevs, u64 intr);
 int otx2_read_free_sqe(struct otx2_nic *pfvf, u16 qidx);
+int otx2_selftest_mbox(struct otx2_nic *pf);
 #endif /* OTX2_COMMON_H */
