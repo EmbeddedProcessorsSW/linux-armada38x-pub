@@ -249,7 +249,7 @@ int otx2_qos_enable_sq(struct otx2_nic *pfvf, int qidx)
 		goto out;
 
 	pool_id = otx2_get_pool_idx(pfvf, AURA_NIX_SQ, sq_idx);
-	err = otx2_sq_init(pfvf, sq_idx, pool_id);
+	err = otx2_sq_init(pfvf, sq_idx, pool_id, SQ_QOS);
 	if (err)
 		goto out;
 out:

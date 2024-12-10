@@ -83,6 +83,18 @@ struct sg_list {
 	u64	dma_addr[OTX2_MAX_FRAGS_IN_SQE];
 };
 
+enum sq_types {
+	SQ_TX,
+	SQ_XDP,
+	SQ_QOS,
+	SQ_MAX_TYPES = 3,
+};
+
+enum sq_features {
+	OTX2_SQ_TSO = BIT(0),
+	OTX2_SQ_PTP = BIT(1),
+};
+
 struct otx2_snd_queue {
 	u8			aura_id;
 	u16			head;

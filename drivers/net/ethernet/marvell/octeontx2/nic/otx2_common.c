@@ -16,6 +16,12 @@
 #include "cn10k.h"
 #include "otx2_xsk.h"
 
+static int per_sq_features[SQ_MAX_TYPES] = {
+	[SQ_TX]  = OTX2_SQ_TSO | OTX2_SQ_PTP,
+	[SQ_XDP] = 0,
+	[SQ_QOS] = OTX2_SQ_PTP
+};
+
 static void otx2_nix_rq_op_stats(struct queue_stats *stats,
 				 struct otx2_nic *pfvf, int qidx)
 {
@@ -982,7 +988,7 @@ int otx2_sq_aq_init(void *dev, u16 qidx, u8 chan_offset, u16 sqb_aura)
 	return otx2_sync_mbox_msg(&pfvf->mbox);
 }
 
-int otx2_sq_init(struct otx2_nic *pfvf, u16 qidx, u16 sqb_aura)
+int otx2_sq_init(struct otx2_nic *pfvf, u16 qidx, u16 sqb_aura, enum sq_types type)
 {
 	struct otx2_qset *qset = &pfvf->qset;
 	struct otx2_snd_queue *sq;
@@ -999,7 +1005,7 @@ int otx2_sq_init(struct otx2_nic *pfvf, u16 qidx, u16 sqb_aura)
 	if (err)
 		return err;
 
-	if (qidx < pfvf->hw.tx_queues) {
+	if (per_sq_features[type] & OTX2_SQ_TSO) {
 		err = qmem_alloc(pfvf->dev, &sq->tso_hdrs, qset->sqe_cnt,
 				 TSO_HEADER_SIZE);
 		if (err)
@@ -1011,7 +1017,7 @@ int otx2_sq_init(struct otx2_nic *pfvf, u16 qidx, u16 sqb_aura)
 	if (!sq->sg)
 		return -ENOMEM;
 
-	if (pfvf->ptp && qidx < pfvf->hw.tx_queues) {
+	if (pfvf->ptp && per_sq_features[type] & OTX2_SQ_PTP) {
 		err = qmem_alloc(pfvf->dev, &sq->timestamps, qset->sqe_cnt,
 				 sizeof(*sq->timestamps));
 		if (err)
@@ -1031,7 +1037,7 @@ int otx2_sq_init(struct otx2_nic *pfvf, u16 qidx, u16 sqb_aura)
 	sq->stats.bytes = 0;
 	sq->stats.pkts = 0;
 	/* Attach XSK_BUFF_POOL to XDP queue */
-	if (qidx > pfvf->hw.xdp_queues)
+	if (type == SQ_XDP)
 		otx2_attach_xsk_buff(pfvf, sq, (qidx - pfvf->hw.xdp_queues));
 
 
@@ -1178,7 +1184,8 @@ int otx2_config_nix_queues(struct otx2_nic *pfvf)
 	for (qidx = 0; qidx < pfvf->hw.non_qos_queues; qidx++) {
 		u16 sqb_aura = otx2_get_pool_idx(pfvf, AURA_NIX_SQ, qidx);
 
-		err = otx2_sq_init(pfvf, qidx, sqb_aura);
+		err = otx2_sq_init(pfvf, qidx, sqb_aura,
+				   (qidx < pfvf->hw.tx_queues) ? SQ_TX : SQ_XDP);
 		if (err)
 			return err;
 	}
