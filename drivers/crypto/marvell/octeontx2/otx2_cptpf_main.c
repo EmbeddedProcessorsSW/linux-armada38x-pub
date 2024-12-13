@@ -70,8 +70,8 @@ static void cptpf_disable_vfpf_mbox_intr(struct otx2_cptpf_dev *cptpf,
 	}
 }
 
-void cptpf_cn20k_disable_vfpf_mbox_intr(struct otx2_cptpf_dev *cptpf,
-					int numvfs)
+static void cptpf_cn20k_disable_vfpf_mbox_intr(struct otx2_cptpf_dev *cptpf,
+					       int numvfs)
 {
 	int vector = 0, intr_vec;
 
@@ -279,8 +279,8 @@ static void cptpf_unregister_vfpf_intr(struct otx2_cptpf_dev *cptpf,
 	cptpf_disable_vf_flr_me_intrs(cptpf, num_vfs);
 }
 
-void cptpf_cn20k_enable_vfpf_mbox_intr(struct otx2_cptpf_dev *cptpf,
-				       int numvfs)
+static void cptpf_cn20k_enable_vfpf_mbox_intr(struct otx2_cptpf_dev *cptpf,
+					      int numvfs)
 {
 	/* Clear PF <=> VF mailbox IRQ */
 	otx2_cpt_write64(cptpf->reg_base, BLKADDR_RVUM, 0,
@@ -308,8 +308,8 @@ void cptpf_cn20k_enable_vfpf_mbox_intr(struct otx2_cptpf_dev *cptpf,
 	}
 }
 
-int cptpf_cn20k_register_vfpf_mbox_intr(struct otx2_cptpf_dev *cptpf,
-					int num_vfs)
+static int cptpf_cn20k_register_vfpf_mbox_intr(struct otx2_cptpf_dev *cptpf,
+					       int num_vfs)
 {
 	struct cptpf_irq_data *irq_data = &cptpf->irq_data[0];
 	int intr_vec, ret, vec = 0;
