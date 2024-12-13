@@ -406,7 +406,6 @@ hw_access_cgx_info(struct rvu *rvu, unsigned long arg)
 	struct hw_cgx_info cgx_info;
 	struct rvu_pfvf *pfvf;
 	u8 cgx_id, lmac_id, pf;
-	u16 pcifunc;
 
 	if (copy_from_user(&cgx_info, (void __user *)arg, sizeof(struct hw_cgx_info))) {
 		pr_err("Reading PF value failed: copy from user\n");
@@ -419,7 +418,6 @@ hw_access_cgx_info(struct rvu *rvu, unsigned long arg)
 		return -EFAULT;
 	}
 
-	pcifunc = pf << 10;
 	pfvf = &rvu->pf[pf];
 	rvu_get_cgx_lmac_id(rvu->pf2cgxlmac_map[pf], &cgx_id,
 			    &lmac_id);
