@@ -87,7 +87,7 @@ static int otx2_xsk_ctx_disable(struct otx2_nic *pfvf, u16 qidx, int aura_id)
 	return otx2_sync_mbox_msg(&pfvf->mbox);
 }
 
-void otx2_clean_up_rq(struct otx2_nic *pfvf, int qidx)
+static void otx2_clean_up_rq(struct otx2_nic *pfvf, int qidx)
 {
 	struct otx2_qset *qset = &pfvf->qset;
 	struct otx2_cq_queue *cq;
