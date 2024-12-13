@@ -13,7 +13,7 @@
 #include "reg.h"
 #include "api.h"
 
-irqreturn_t cn20k_afvf_mbox_intr_handler(int irq, void *rvu_irq)
+static irqreturn_t cn20k_afvf_mbox_intr_handler(int irq, void *rvu_irq)
 {
 	struct rvu_irq_data *rvu_irq_data = (struct rvu_irq_data *)rvu_irq;
 	struct rvu *rvu = rvu_irq_data->rvu;
