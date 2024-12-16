@@ -8,9 +8,20 @@
 #include "otx2_cpt_common.h"
 #include "otx2_cptpf.h"
 
+#define RES_META_OFFSET_MASK GENMASK(36, 32)
+
 struct otx2_cpt_devlink {
 	struct devlink *dl;
 	struct otx2_cptpf_dev *cptpf;
+};
+
+enum otx2_cpt_dl_param_id {
+	OTX2_CPT_DEVLINK_PARAM_ID_BASE = DEVLINK_PARAM_GENERIC_ID_MAX,
+	OTX2_CPT_DEVLINK_PARAM_ID_EGRP_CREATE,
+	OTX2_CPT_DEVLINK_PARAM_ID_EGRP_DELETE,
+	OTX2_CPT_DEVLINK_PARAM_ID_MAX_RXC_ICB_CNT,
+	OTX2_CPT_DEVLINK_PARAM_ID_T106_MODE,
+	CN20K_CPT_DEVLINK_PARAM_ID_RES_META_OFFSET,
 };
 
 /* Devlink APIs */

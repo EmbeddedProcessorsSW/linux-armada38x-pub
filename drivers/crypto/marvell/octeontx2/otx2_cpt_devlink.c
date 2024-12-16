@@ -104,13 +104,39 @@ static int otx2_cpt_dl_t106_mode_set(struct devlink *dl, u32 id,
 	return 0;
 }
 
-enum otx2_cpt_dl_param_id {
-	OTX2_CPT_DEVLINK_PARAM_ID_BASE = DEVLINK_PARAM_GENERIC_ID_MAX,
-	OTX2_CPT_DEVLINK_PARAM_ID_EGRP_CREATE,
-	OTX2_CPT_DEVLINK_PARAM_ID_EGRP_DELETE,
-	OTX2_CPT_DEVLINK_PARAM_ID_MAX_RXC_ICB_CNT,
-	OTX2_CPT_DEVLINK_PARAM_ID_T106_MODE,
-};
+static int cn20k_cpt_get_res_meta_offset(struct devlink *dl, u32 id,
+					 struct devlink_param_gset_ctx *ctx)
+{
+	struct otx2_cpt_devlink *cpt_dl = devlink_priv(dl);
+	struct otx2_cptpf_dev *cptpf = cpt_dl->cptpf;
+	struct pci_dev *pdev = cptpf->pdev;
+	u64 reg_val = 0;
+
+	otx2_cpt_read_af_reg(&cptpf->afpf_mbox, pdev, CPT_AF_CTL, &reg_val,
+			     BLKADDR_CPT0);
+	ctx->val.vu8 = FIELD_GET(RES_META_OFFSET_MASK, reg_val);
+
+	return 0;
+}
+
+static int cn20k_cpt_set_res_meta_offset(struct devlink *dl, u32 id,
+					 struct devlink_param_gset_ctx *ctx)
+{
+	struct otx2_cpt_devlink *cpt_dl = devlink_priv(dl);
+	struct otx2_cptpf_dev *cptpf = cpt_dl->cptpf;
+	struct pci_dev *pdev = cptpf->pdev;
+	u64 reg_val = 0;
+
+	if (cptpf->enabled_vfs != 0 || cptpf->eng_grps.is_grps_created)
+		return -EPERM;
+
+	otx2_cpt_read_af_reg(&cptpf->afpf_mbox, pdev, CPT_AF_CTL,
+			     &reg_val, BLKADDR_CPT0);
+	reg_val &= ~RES_META_OFFSET_MASK;
+	reg_val |= FIELD_PREP(RES_META_OFFSET_MASK, (u64)ctx->val.vu8);
+	return otx2_cpt_write_af_reg(&cptpf->afpf_mbox, pdev,
+				     CPT_AF_CTL, reg_val, BLKADDR_CPT0);
+}
 
 static const struct devlink_param otx2_cpt_dl_params[] = {
 	DEVLINK_PARAM_DRIVER(OTX2_CPT_DEVLINK_PARAM_ID_EGRP_CREATE,
@@ -134,6 +160,16 @@ static const struct devlink_param otx2_cpt_dl_params[] = {
 			     BIT(DEVLINK_PARAM_CMODE_RUNTIME),
 			     otx2_cpt_dl_t106_mode_get, otx2_cpt_dl_t106_mode_set,
 			     NULL),
+};
+
+/* CN20K specific extra devlink parameters */
+static const struct devlink_param cn20k_cpt_dl_params[] = {
+	DEVLINK_PARAM_DRIVER(CN20K_CPT_DEVLINK_PARAM_ID_RES_META_OFFSET,
+			     "res_meta_offset", DEVLINK_PARAM_TYPE_U8,
+			    BIT(DEVLINK_PARAM_CMODE_RUNTIME),
+			    cn20k_cpt_get_res_meta_offset,
+			    cn20k_cpt_set_res_meta_offset,
+			    NULL),
 };
 
 static int otx2_cpt_dl_info_firmware_version_put(struct devlink_info_req *req,
@@ -209,6 +245,21 @@ int otx2_cpt_register_dl(struct otx2_cptpf_dev *cptpf)
 		devlink_free(dl);
 		return ret;
 	}
+
+	if (is_cn20k(cptpf->pdev)) {
+		unsigned int param_size = ARRAY_SIZE(otx2_cpt_dl_params);
+
+		ret = devlink_params_register(dl, cn20k_cpt_dl_params,
+					      ARRAY_SIZE(cn20k_cpt_dl_params));
+		if (ret) {
+			dev_err(dev, "devlink params register failed with error %d",
+				ret);
+			devlink_params_unregister(dl, otx2_cpt_dl_params,
+						  param_size);
+			devlink_free(dl);
+			return ret;
+		}
+	}
 	devlink_register(dl);
 
 	return 0;
@@ -224,5 +275,8 @@ void otx2_cpt_unregister_dl(struct otx2_cptpf_dev *cptpf)
 	devlink_unregister(dl);
 	devlink_params_unregister(dl, otx2_cpt_dl_params,
 				  ARRAY_SIZE(otx2_cpt_dl_params));
+	if (is_cn20k(cptpf->pdev))
+		devlink_params_unregister(dl, cn20k_cpt_dl_params,
+					  ARRAY_SIZE(cn20k_cpt_dl_params));
 	devlink_free(dl);
 }
