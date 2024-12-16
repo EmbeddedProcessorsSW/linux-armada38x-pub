@@ -3204,6 +3204,10 @@ static void rvu_blklf_teardown(struct rvu *rvu, u16 pcifunc, u8 blkaddr)
 					    slot);
 		else if (block->addr == BLKADDR_ML)
 			rvu_ml_lf_teardown(rvu, pcifunc, lf, slot);
+		else if ((block->addr == BLKADDR_DPI0) ||
+			 (block->addr == BLKADDR_DPI1))
+			rvu_dpi_lf_teardown(rvu, pcifunc, block->addr, lf,
+					    slot);
 
 		err = rvu_lf_reset(rvu, block, lf);
 		if (err) {
@@ -3258,6 +3262,8 @@ void __rvu_flr_handler(struct rvu *rvu, u16 pcifunc)
 	rvu_blklf_teardown(rvu, pcifunc, BLKADDR_SSOW);
 	rvu_blklf_teardown(rvu, pcifunc, BLKADDR_SSO);
 	rvu_blklf_teardown(rvu, pcifunc, BLKADDR_NPA);
+	rvu_blklf_teardown(rvu, pcifunc, BLKADDR_DPI0);
+	rvu_blklf_teardown(rvu, pcifunc, BLKADDR_DPI1);
 	rvu_reset_lmt_map_tbl(rvu, pcifunc);
 	rvu_detach_rsrcs(rvu, NULL, pcifunc);
 	rvu_sso_pfvf_rst(rvu, pcifunc);
