@@ -35,4 +35,7 @@ void cn20k_rvu_disable_afvf_intr(struct rvu *rvu, int vfs);
 int cn20k_register_flr_me_afpf_interrupts(struct rvu *rvu);
 void cn20k_flr_finish(struct rvu *rvu, int pf);
 void cn20k_disable_flr_me(struct rvu *rvu);
+
+int rvu_cn20k_set_channels_base(struct rvu *rvu);
+void rvu_cn20k_cpt_chan_cfg(struct rvu *rvu);
 #endif /* CN20K_API_H */
