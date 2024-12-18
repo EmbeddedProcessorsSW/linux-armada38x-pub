@@ -1189,13 +1189,6 @@ static void cpt_cn10k_rxc_flush(struct rvu *rvu, int blkaddr)
 static void cpt_rxc_teardown(struct rvu *rvu, u16 pcifunc, int blkaddr,
 			     int cptlf)
 {
-	u64 val;
-
-	/* Check for RXC enabled on given CPT-LF */
-	val = rvu_read64(rvu, blkaddr, CPT_AF_LFX_CTL(cptlf));
-	if (!(val & BIT_ULL(11)))
-		return;
-
 	if (is_cn20k(rvu->pdev))
 		cpt_cn20k_rxc_teardown(rvu, pcifunc, blkaddr);
 	else
