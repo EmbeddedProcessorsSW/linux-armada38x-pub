@@ -403,7 +403,9 @@ static int otx2_devlink_eswitch_mode_set(struct devlink *devlink, u16 mode,
 
 	switch (mode) {
 	case DEVLINK_ESWITCH_MODE_LEGACY:
+		devl_unlock(devlink);
 		rvu_rep_destroy(pfvf);
+		devl_lock(devlink);
 		break;
 	case DEVLINK_ESWITCH_MODE_SWITCHDEV:
 		devl_unlock(devlink);
