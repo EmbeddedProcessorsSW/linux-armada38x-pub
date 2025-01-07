@@ -750,12 +750,13 @@ static void skb_clone_fraglist(struct sk_buff *skb)
 		skb_get(list);
 }
 
+#if IS_ENABLED(CONFIG_PAGE_POOL)
+
 static bool is_pp_page(struct page *page)
 {
 	return (page->pp_magic & ~0x3UL) == PP_SIGNATURE;
 }
 
-#if IS_ENABLED(CONFIG_PAGE_POOL)
 bool napi_pp_put_page(struct page *page, bool napi_safe)
 {
 	struct page_pool *pp;
